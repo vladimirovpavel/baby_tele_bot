@@ -7,6 +7,10 @@ import (
 
 type babyI interface {
 	getState() string
+	SetId(int64)
+	SetName(string)
+	SetParent(int64)
+	SetBith(time.Time)
 
 	Id() int64
 	ParentId() int64
@@ -96,4 +100,20 @@ func (b baby) Birth() time.Time {
 
 func (b baby) String() string {
 	return fmt.Sprintf("%s %s", b.Name(), b.Birth())
+}
+
+func (b *baby) SetParent(parentId int64) {
+	b.parentId = parentId
+}
+
+func (b *baby) SetName(name string) {
+	b.name = name
+}
+
+func (b *baby) SetBirth(birth time.Time) {
+	b.birth = birth
+}
+
+func (b *baby) SetId(id int64) {
+	b.id = id
 }

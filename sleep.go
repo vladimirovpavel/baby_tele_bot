@@ -29,8 +29,9 @@ func newSleep(initEvent event) sleep {
 }
 
 func (s *sleep) writeStructToBase() error {
-	query_string := fmt.Sprintf("insert into sleep (baby_id, sleep_start) "+
-		"values (%d, '%s') RETURNING sleep_id", s.Baby().Id(), s.Start().Format("2006-01-02 03:04"))
+	query_string := fmt.Sprintf("insert into sleep (baby_id, start) "+
+		"values (%d, '%s') RETURNING sleep_id", s.BabyId(), s.Start().Format("2006-01-02 03:04"))
+	fmt.Println(query_string)
 	pIdRow, err := DBInsertAndGet(query_string)
 	if err != nil {
 		return err
@@ -44,6 +45,17 @@ func (s *sleep) writeStructToBase() error {
 	}
 	s.id = sleepId
 	return nil
+}
+
+func (s *sleep) updateEndSleepTime() error {
+	query_string := fmt.Sprintf("update sleep set sleep_end = '%s' "+
+		"WHERE sleep_id = %d", s.End().Format("2006-01-02 03:04"), s.Id())
+	_, err := DBInsertAndGet(query_string)
+	if err != nil {
+		return err
+	}
+	return nil
+
 }
 
 //read first sleep of date

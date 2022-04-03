@@ -40,7 +40,7 @@ func (e eat) Id() int64 {
 func (e *eat) writeStructToBase() error {
 	query_string := fmt.Sprintf("insert into eat(baby_id, start, description) "+
 		"VALUES (%d, '%s', '%s') RETURNING eat_id;",
-		e.event.Baby().Id(), e.event.Start().Format("2006-01-02"), e.Description())
+		e.event.BabyId(), e.event.Start().Format("2006-01-02"), e.Description())
 	row, err := DBInsertAndGet(query_string)
 	if err != nil {
 		return err
@@ -52,6 +52,8 @@ func (e *eat) writeStructToBase() error {
 	e.id = eatId
 	return nil
 }
+
+//DELETE????
 func (e eat) readStructFromBase(query interface{}) (interface{}, error) {
 	q := query.([]string)
 

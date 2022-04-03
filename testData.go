@@ -69,61 +69,71 @@ func createTestData() ([]parent, []baby, []pampers, []eat, []sleep) {
 	}
 	babyes = append(babyes, b)
 
-	e := newEvent(babyes[0], getDataForTest())
-	pamp := newPampers(e)
+	e := newEvent(babyes[0].Id(), getDataForTest())
+	pamp := newPampers(*e)
 	pamp.SetState(wet)
 	if err := pamp.writeStructToBase(); err != nil {
 		fmt.Println(err)
 	}
 	pamperses = append(pamperses, pamp)
 
-	e = newEvent(babyes[1], getDataForTest())
-	pamp = newPampers(e)
+	e = newEvent(babyes[1].Id(), getDataForTest())
+	pamp = newPampers(*e)
 	pamp.SetState(dirty)
 	if err := pamp.writeStructToBase(); err != nil {
 		fmt.Println(err)
 	}
 	pamperses = append(pamperses, pamp)
 
-	e = newEvent(babyes[2], getDataForTest())
-	pamp = newPampers(e)
+	e = newEvent(babyes[2].Id(), getDataForTest())
+	pamp = newPampers(*e)
 	pamp.SetState(combined)
 	if err := pamp.writeStructToBase(); err != nil {
 		fmt.Println(err)
 	}
 	pamperses = append(pamperses, pamp)
 
-	e = newEvent(babyes[2], getDataForTest())
-	eat := newEat(e)
+	e = newEvent(babyes[2].Id(), getDataForTest())
+	eat := newEat(*e)
 	eat.SetDescription("50g porrige")
 	if err := eat.writeStructToBase(); err != nil {
 		fmt.Println(err)
 	}
+	eats = append(eats, eat)
 
-	e = newEvent(babyes[0], getDataForTest())
-	eat = newEat(e)
+	e = newEvent(babyes[0].Id(), getDataForTest())
+	eat = newEat(*e)
 	eat.SetDescription("100g spahetty")
 	if err := eat.writeStructToBase(); err != nil {
 		fmt.Println(err)
 	}
+	eats = append(eats, eat)
 
-	e = newEvent(babyes[1], getDataForTest())
-	sleep := newSleep(e)
+	e = newEvent(babyes[1].Id(), getDataForTest())
+	sleep := newSleep(*e)
 	sleep.setEndTime(getDataForTest())
 	if err := sleep.writeStructToBase(); err != nil {
 		fmt.Println(err)
 	}
+	sleeps = append(sleeps, sleep)
 
-	e = newEvent(babyes[1], getDataForTest())
-	sleep = newSleep(e)
+	e = newEvent(babyes[1].Id(), getDataForTest())
+	sleep = newSleep(*e)
 	sleep.setEndTime(getDataForTest())
 	if err := sleep.writeStructToBase(); err != nil {
 		fmt.Println(err)
 	}
-	e = newEvent(babyes[1], getDataForTest())
-	sleep = newSleep(e)
+	sleeps = append(sleeps, sleep)
+	e = newEvent(babyes[1].Id(), getDataForTest())
+	sleep = newSleep(*e)
 	sleep.setEndTime(getDataForTest())
 	if err := sleep.writeStructToBase(); err != nil {
+		fmt.Println(err)
+	}
+	sleeps = append(sleeps, sleep)
+
+	sleeps[0].setEndTime(getDataForTest())
+	if err := sleeps[0].updateEndSleepTime(); err != nil {
 		fmt.Println(err)
 	}
 

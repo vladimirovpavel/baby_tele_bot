@@ -32,7 +32,7 @@ func newPampers(initEvent event) pampers {
 
 func (p *pampers) writeStructToBase() error {
 	query_string := fmt.Sprintf("insert into pampers(baby_id, start, state) "+
-		"values(%d, '%s', %d) RETURNING pampers_id", p.Baby().Id(), p.Start().Format("2006-01-02"), p.State())
+		"values(%d, '%s', %d) RETURNING pampers_id", p.BabyId(), p.Start().Format("2006-01-02"), p.State())
 
 	pIdRow, err := DBInsertAndGet(query_string)
 	if err != nil {
