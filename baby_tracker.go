@@ -1,10 +1,5 @@
 package main
 
-import (
-	"fmt"
-	"time"
-)
-
 /*
 TODO:
 1. OK реализовать Write struct to base для всех событий
@@ -23,10 +18,11 @@ TODO:
 */
 
 func main() {
-	start := time.Date(1975, 2, 17, 0, 0, 0, 0, time.UTC)
+	telegramBot()
+	/* start := time.Date(1975, 2, 17, 0, 0, 0, 0, time.UTC)
 	query := DBEventQuery{table: "eat", babyId: 1, start: start}
 	res, _ := SelectEventByBabyDate(query)
-	fmt.Printf("%s", res[0])
+	fmt.Printf("%s", res[0]) */
 	//a, b, c, d, e := createTestData()
 	//fmt.Println(a, b, c, d, e)
 	/* p := newParent()
