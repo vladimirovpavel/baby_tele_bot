@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type pampersState int64
 
@@ -12,6 +15,7 @@ const (
 
 //----------------------PAMPERS interface-----------------------
 type pampersI interface {
+	eventBaseWorker
 	eventI
 	SetState(pampersState)
 
@@ -25,14 +29,14 @@ type pampers struct {
 	state pampersState
 }
 
-func newPampers(initEvent event) pampers {
-	p := pampers{event: initEvent}
+func newPampers(initEvent event) *pampers {
+	p := &pampers{event: initEvent}
 	return p
 }
 
 func (p *pampers) writeStructToBase() error {
 	query_string := fmt.Sprintf("insert into pampers(baby_id, start, state) "+
-		"values(%d, '%s', %d) RETURNING pampers_id", p.BabyId(), p.Start().Format("2006-01-02"), p.State())
+		"values(%d, '%s', %d) RETURNING id", p.BabyId(), p.Start().Format("2006-01-02"), p.State())
 
 	pIdRow, err := DBInsertAndGet(query_string)
 	if err != nil {
@@ -45,6 +49,30 @@ func (p *pampers) writeStructToBase() error {
 	}
 	p.id = pampersId
 	return nil
+}
+
+//read sleep by id
+func (p *pampers) readStructFromBase(id int64) error {
+
+	query_string := fmt.Sprintf("select (baby_id, start, state) "+
+		"from pampers where id = %d", id)
+
+	row, err := DBReadRow(query_string)
+	if err != nil {
+		return err
+	}
+	var babyId int64
+	var start time.Time
+	var state pampersState
+	if err := row.Scan(&babyId, &start, &state); err != nil {
+		return err
+	}
+	p.SetBabyId(babyId)
+	p.SetStart(start)
+	p.SetState(state)
+
+	return nil
+
 }
 
 func (p *pampers) SetState(ps pampersState) {

@@ -7,8 +7,10 @@ import (
 
 //----------------------SLEEP interface-----------------------
 type sleepI interface {
+	eventBaseWorker
 	eventI
 	setEndTime(time.Time)
+	updateEndSleepTime() error
 	calcDuration()
 
 	Duration() time.Duration
@@ -23,14 +25,51 @@ type sleep struct {
 	id       int64
 }
 
-func newSleep(initEvent event) sleep {
-	s := sleep{event: initEvent}
+func newSleep(initEvent event) *sleep {
+	s := &sleep{event: initEvent}
 	return s
+}
+
+func (s *sleep) updateEndSleepTime() error {
+	query_string := fmt.Sprintf("update sleep set sleep_end = '%s' "+
+		"WHERE id = %d", s.End().Format("2006-01-02 03:04"), s.Id())
+	_, err := DBInsertAndGet(query_string)
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
+//read sleep by id
+func (s *sleep) readStructFromBase(id int64) error {
+
+	/* query_string := fmt.Sprintf("select (baby_id, start, sleep_end) "+
+	"from sleep where sleep_start > '%s' and sleep_start < ('%s' + '1 day'::interval",
+	date, date) */
+	query_string := fmt.Sprintf("select (baby_id, start, sleep_end) "+
+		"from sleep where id = %d", id)
+
+	row, err := DBReadRow(query_string)
+	if err != nil {
+		return err
+	}
+	var babyId int64
+	var start time.Time
+	var sleepEnd time.Time
+	if err := row.Scan(&babyId, &start, &sleepEnd); err != nil {
+		return err
+	}
+	s.SetBabyId(babyId)
+	s.SetStart(start)
+	s.setEndTime(sleepEnd)
+
+	return nil
 }
 
 func (s *sleep) writeStructToBase() error {
 	query_string := fmt.Sprintf("insert into sleep (baby_id, start) "+
-		"values (%d, '%s') RETURNING sleep_id", s.BabyId(), s.Start().Format("2006-01-02 03:04"))
+		"values (%d, '%s') RETURNING id", s.BabyId(), s.Start().Format("2006-01-02 03:04"))
 	fmt.Println(query_string)
 	pIdRow, err := DBInsertAndGet(query_string)
 	if err != nil {
@@ -45,37 +84,6 @@ func (s *sleep) writeStructToBase() error {
 	}
 	s.id = sleepId
 	return nil
-}
-
-func (s *sleep) updateEndSleepTime() error {
-	query_string := fmt.Sprintf("update sleep set sleep_end = '%s' "+
-		"WHERE sleep_id = %d", s.End().Format("2006-01-02 03:04"), s.Id())
-	_, err := DBInsertAndGet(query_string)
-	if err != nil {
-		return err
-	}
-	return nil
-
-}
-
-//read first sleep of date
-func (s *sleep) readStructFromBase(query interface{}) error {
-	/* date := query.(string)
-	var sleep
-	query_string := fmt.Sprintf("select (baby_id, sleep_start, sleep_end, duration) "+
-		"from sleep where sleep_start > '%s' and sleep_start < ('%s' + '1 day'::interval",
-		date, date)
-	row, err := DBReadRow(query_string)
-	if err != nil {
-		return err
-	}
-
-	if err := rows.Scan(); err != nil {
-		return err
-	}*/
-
-	return nil
-
 }
 
 func (s *sleep) setEndTime(t time.Time) {

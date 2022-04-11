@@ -6,62 +6,68 @@ import (
 	_ "github.com/jackc/pgx/stdlib"
 )
 
-type parentI interface {
-	// TODO: what about set funcs&
+//меняем ID на телеграм ID. Удаляем phone, добавляем current_baby
 
-	Id()
-	Phone()
-	Name()
+//TODO: current baby
+type parentI interface {
+	eventBaseWorker
+
+	SetId(id int64)
+	SetName(name string)
+	SetCurrentBaby(babyId int64) //TODO: implement this
+
+	Id() int64
+	Name() string
+	CurrentBaby() int64
 }
 
 type parent struct {
-	id    int64
-	name  string
-	phone string
-	// #TODO: store phone in DB as 10 digits for Russia
+	id          int64
+	name        string
+	currentBaby int64
 }
 
-func newParent() parent {
-	p := parent{}
+func newParent() *parent {
+	p := &parent{}
 	return p
 }
 
 func (p *parent) writeStructToBase() error {
-	query := fmt.Sprintf("insert into parent(name, phone) "+
-		"values('%s', '%s') RETURNING parent_id", p.Name(), p.Phone())
+	queryString := fmt.Sprintf("insert into parent(parent_id, name) "+
+		"values('%d', '%s') RETURNING parent_id", p.Id(), p.Name())
 
-	pIdRow, err := DBInsertAndGet(query)
+	//pIdRow, err := DBInsertAndGet(query)
+	_, err := DBInsertAndGet(queryString)
 	if err != nil {
 		return err
 	}
 
-	var parentId int64
+	/* var parentId int64
 	if err = pIdRow.Scan(&parentId); err != nil {
 		return err
 	}
-	p.id = parentId
+	p.id = parentId */
 	return nil
 }
 
-//read parent by phone
-func (p *parent) readStructFromBase(query interface{}) error {
-	var parentId int64
-	var name string
+//read parent by id
+func (p *parent) readStructFromBase(id int64) error {
+	queryString := fmt.Sprintf("select name, current_baby from parent where parent_id=%d", id)
 
-	parentPhone := query.(string)
-	query_string := fmt.Sprintf("select parent_id, name from parent where phone=%s", parentPhone)
-
-	row, err := DBReadRow(query_string)
+	row, err := DBReadRow(queryString)
 	if err != nil {
 		return err
 	}
-	if err := row.Scan(&parentId, &name); err != nil {
+
+	var name string
+	var currentBaby int64
+	if err := row.Scan(&name, &currentBaby); err != nil {
 		return err
 	}
 
-	p.id = parentId
-	p.phone = parentPhone
-	p.name = name
+	p.SetId(id)
+	p.SetName(name)
+	p.SetCurrentBaby(currentBaby)
 
 	return nil
 }
@@ -69,10 +75,22 @@ func (p *parent) readStructFromBase(query interface{}) error {
 func (p parent) Id() int64 {
 	return p.id
 }
-func (p parent) Phone() string {
-	return p.phone
-}
 
 func (p parent) Name() string {
 	return p.name
+}
+
+func (p parent) CurrentBaby() int64 {
+	return p.currentBaby
+}
+
+func (p *parent) SetId(id int64) {
+	p.id = id
+}
+func (p *parent) SetName(name string) {
+	p.name = name
+}
+
+func (p *parent) SetCurrentBaby(id int64) {
+	p.currentBaby = id
 }

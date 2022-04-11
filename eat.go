@@ -1,13 +1,13 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"time"
 )
 
 //----------------------EAT interface-----------------------
 type eatI interface {
+	eventBaseWorker
 	eventI
 	SetDescription(string)
 
@@ -20,8 +20,8 @@ type eat struct {
 	description string
 }
 
-func newEat(initEvent event) eat {
-	e := eat{event: initEvent}
+func newEat(initEvent event) *eat {
+	e := &eat{event: initEvent}
 	return e
 }
 
@@ -39,7 +39,7 @@ func (e eat) Id() int64 {
 
 func (e *eat) writeStructToBase() error {
 	query_string := fmt.Sprintf("insert into eat(baby_id, start, description) "+
-		"VALUES (%d, '%s', '%s') RETURNING eat_id;",
+		"VALUES (%d, '%s', '%s') RETURNING id;",
 		e.event.BabyId(), e.event.Start().Format("2006-01-02"), e.Description())
 	row, err := DBInsertAndGet(query_string)
 	if err != nil {
@@ -53,29 +53,27 @@ func (e *eat) writeStructToBase() error {
 	return nil
 }
 
-//DELETE????
-func (e eat) readStructFromBase(query interface{}) (interface{}, error) {
-	q := query.([]string)
+//fill current eat by id
+func (e *eat) readStructFromBase(id int64) error {
 
-	babyId := q[0]
-	eatTime := q[1]
-	db, err := sql.Open("postgres", dbInfo)
+	queryString := fmt.Sprintf("select baby_id, start, description "+
+		"from eat where id = %d", id)
+	row, err := DBInsertAndGet(queryString)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer db.Close()
-	res, err := db.Query("select baby_id, start, description "+
-		"from eat where start > %s, baby_id == %s",
-		eatTime, babyId)
-	if err != nil {
-		return nil, err
-	}
-	var babyid int64
+
+	var babyId int64
 	var start time.Time
 	var description string
-	if err := res.Scan(&babyid, &start, &description); err != nil {
-		return nil, err
+
+	if err := row.Scan(&babyId, &start, &description); err != nil {
+		return err
 	}
 
-	return nil, nil
+	e.SetBabyId(babyId)
+	e.SetStart(start)
+	e.SetDescription(description)
+
+	return nil
 }
