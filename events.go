@@ -45,3 +45,262 @@ func (e *event) SetStart(t time.Time) {
 func (e event) String() string {
 	return fmt.Sprintf("Event of baby %d, started ad %s", e.babyId, e.Start().Format(("2006-01-02")))
 }
+
+//-------------------------------SLEEP interfaces ------------------------
+
+//----------------------SLEEP interface-----------------------
+type sleepI interface {
+	eventBaseWorker
+	eventI
+	setEndTime(time.Time)
+	updateEndSleepTime() error
+	calcDuration()
+
+	Duration() time.Duration
+	End() time.Time
+	Id() int64
+}
+
+type sleep struct {
+	event
+	endTime  time.Time
+	duration time.Duration
+	id       int64
+}
+
+func newSleep(initEvent event) *sleep {
+	s := &sleep{event: initEvent}
+	return s
+}
+
+func (s *sleep) updateEndSleepTime() error {
+	query_string := fmt.Sprintf("update sleep set sleep_end = '%s' "+
+		"WHERE id = %d", s.End().Format("2006-01-02 03:04"), s.Id())
+	_, err := DBInsertAndGet(query_string)
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
+//read sleep by id
+func (s *sleep) readStructFromBase(id int64) error {
+
+	/* query_string := fmt.Sprintf("select (baby_id, start, sleep_end) "+
+	"from sleep where sleep_start > '%s' and sleep_start < ('%s' + '1 day'::interval",
+	date, date) */
+	query_string := fmt.Sprintf("select (baby_id, start, sleep_end) "+
+		"from sleep where id = %d", id)
+
+	row, err := DBReadRow(query_string)
+	if err != nil {
+		return err
+	}
+	var babyId int64
+	var start time.Time
+	var sleepEnd time.Time
+	if err := row.Scan(&babyId, &start, &sleepEnd); err != nil {
+		return err
+	}
+	s.SetBabyId(babyId)
+	s.SetStart(start)
+	s.setEndTime(sleepEnd)
+
+	return nil
+}
+
+func (s *sleep) writeStructToBase() error {
+	query_string := fmt.Sprintf("insert into sleep (baby_id, start) "+
+		"values (%d, '%s') RETURNING id", s.BabyId(), s.Start().Format("2006-01-02 03:04"))
+	fmt.Println(query_string)
+	pIdRow, err := DBInsertAndGet(query_string)
+	if err != nil {
+		return err
+	}
+
+	var sleepId int64
+
+	err = pIdRow.Scan(&sleepId)
+	if err != nil {
+		return err
+	}
+	s.id = sleepId
+	return nil
+}
+
+func (s *sleep) setEndTime(t time.Time) {
+	s.endTime = t
+	s.calcDuration()
+}
+
+func (s *sleep) calcDuration() {
+	s.duration = s.End().Sub(s.Start())
+}
+
+func (s sleep) Duration() time.Duration {
+	return s.duration
+}
+func (s sleep) End() time.Time {
+	return s.endTime
+}
+func (s sleep) Id() int64 {
+	return s.id
+}
+
+//------------------------------PAMPERS INTERFACES------------------------------
+
+type pampersState int64
+
+const (
+	wet pampersState = iota
+	dirty
+	combined
+)
+
+//----------------------PAMPERS interface-----------------------
+type pampersI interface {
+	eventBaseWorker
+	eventI
+	SetState(pampersState)
+
+	Id() int64
+	State() pampersState
+}
+
+type pampers struct {
+	event
+	id    int64
+	state pampersState
+}
+
+func newPampers(initEvent event) *pampers {
+	p := &pampers{event: initEvent}
+	return p
+}
+
+func (p *pampers) writeStructToBase() error {
+	query_string := fmt.Sprintf("insert into pampers(baby_id, start, state) "+
+		"values(%d, '%s', %d) RETURNING id", p.BabyId(), p.Start().Format("2006-01-02"), p.State())
+
+	pIdRow, err := DBInsertAndGet(query_string)
+	if err != nil {
+		return err
+	}
+
+	var pampersId int64
+	if err = pIdRow.Scan(&pampersId); err != nil {
+		return err
+	}
+	p.id = pampersId
+	return nil
+}
+
+//read sleep by id
+func (p *pampers) readStructFromBase(id int64) error {
+
+	query_string := fmt.Sprintf("select (baby_id, start, state) "+
+		"from pampers where id = %d", id)
+
+	row, err := DBReadRow(query_string)
+	if err != nil {
+		return err
+	}
+	var babyId int64
+	var start time.Time
+	var state pampersState
+	if err := row.Scan(&babyId, &start, &state); err != nil {
+		return err
+	}
+	p.SetBabyId(babyId)
+	p.SetStart(start)
+	p.SetState(state)
+
+	return nil
+
+}
+
+func (p *pampers) SetState(ps pampersState) {
+	p.state = ps
+}
+
+func (p pampers) State() pampersState {
+	return p.state
+}
+
+func (p pampers) Id() int64 {
+	return p.id
+}
+
+//---------------------------------------EAT INTERFACE----------------------------------
+type eatI interface {
+	eventBaseWorker
+	eventI
+	SetDescription(string)
+
+	Id() int64
+	Description() string
+}
+type eat struct {
+	event
+	id          int64
+	description string
+}
+
+func newEat(initEvent event) *eat {
+	e := &eat{event: initEvent}
+	return e
+}
+
+func (e *eat) SetDescription(d string) {
+	e.description = d
+}
+
+func (e eat) Description() string {
+	return e.description
+}
+
+func (e eat) Id() int64 {
+	return e.id
+}
+
+func (e *eat) writeStructToBase() error {
+	query_string := fmt.Sprintf("insert into eat(baby_id, start, description) "+
+		"VALUES (%d, '%s', '%s') RETURNING id;",
+		e.event.BabyId(), e.event.Start().Format("2006-01-02"), e.Description())
+	row, err := DBInsertAndGet(query_string)
+	if err != nil {
+		return err
+	}
+	var eatId int64
+	if err = row.Scan(&eatId); err != nil {
+		return err
+	}
+	e.id = eatId
+	return nil
+}
+
+//fill current eat by id
+func (e *eat) readStructFromBase(id int64) error {
+
+	queryString := fmt.Sprintf("select baby_id, start, description "+
+		"from eat where id = %d", id)
+	row, err := DBInsertAndGet(queryString)
+	if err != nil {
+		return err
+	}
+
+	var babyId int64
+	var start time.Time
+	var description string
+
+	if err := row.Scan(&babyId, &start, &description); err != nil {
+		return err
+	}
+
+	e.SetBabyId(babyId)
+	e.SetStart(start)
+	e.SetDescription(description)
+
+	return nil
+}

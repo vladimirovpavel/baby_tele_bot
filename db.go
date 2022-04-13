@@ -175,9 +175,38 @@ func GetBabyesByParent(parentId int64) ([]babyI, error) {
 	return babyes, err
 }
 
+func GetParentCurrentBaby(parentId int64) (babyI, error) {
+	queryString := fmt.Sprintf("select current_baby from parent where parent_id = %d", parentId)
+	row, err := DBReadRow(queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	var baby_id int64
+
+	if err := row.Scan(&baby_id); err != nil {
+		return nil, err
+	}
+	b := newBaby()
+	if err := b.readStructFromBase(baby_id); err != nil {
+		fmt.Printf("Error reading baby for parent %d:\n%s", parentId, err)
+	}
+
+	return b, nil
+}
+
 func GetBabyesEventsByDate(id int64, t time.Time) ([]eventI, error) {
 	/* query_string := fmt.Sprintf("select (baby_id, start, sleep_end) "+
 	"from sleep where sleep_start > '%s' and sleep_start < ('%s' + '1 day'::interval",
 	date, date) */
 	return nil, nil
+}
+
+func removeBabyFromBase(babyId int64) error {
+	queryString := fmt.Sprintf("delete from baby where baby_id = %d", babyId)
+	_, err := DBReadRow(queryString)
+	if err != nil {
+		return err
+	}
+	return nil
 }

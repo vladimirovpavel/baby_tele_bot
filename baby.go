@@ -55,9 +55,9 @@ func (b *baby) writeStructToBase() error {
 
 //read baby by babyid
 func (b *baby) readStructFromBase(id int64) error {
-	query_string := fmt.Sprintf("select parent_id, name, birth from baby where baby_id=%d", id)
+	queryString := fmt.Sprintf("select parent_id, name, birth from baby where baby_id=%d", id)
 
-	row, err := DBReadRow(query_string)
+	row, err := DBReadRow(queryString)
 	if err != nil {
 		return err
 	}

@@ -3,34 +3,21 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// добавлен интерфейс userActivityInterface и конструктор клавиатур
-// в итоге
-// добавлены структуры активностей пользователя
-// добавлен вывод детей для подменю детей
+// TODO: проблема работы с несколькими клиентами вообще. Нужно где-то учитывать статус пользвоателя
+// добавлена doActivity для Baby
+// pampers, eat, sleep структуры и интефрейсы перенесены в events.go
 
-// начата реализация doAction. Проверить корректность работы - на каждую команду
-// дожлна появляться inline клавиатура. На каждое нажатие кнопок на ней
-// должен отрабаывать соответствующий doAction
+// далее нужны do activiti для event, do activity для state
 
-// далее надо реализовывать doAction с реальной записью или запросом в\из db
-
-/*
-const (
-	stableState tgBotState = iota
-	waitingEvent
-	waitingBabyAdd
-	waitingBabySet
-	waitingBabyRemove
-	waitingState
-)
-*/
 type userActivityInterface interface {
-	doActivity(args string) error
+	doActivity(args ...string) (string, error)
 	setAction(action string)
 	Action() string
 	Description(action string) string
@@ -48,14 +35,13 @@ type userActivity struct {
 func (ua userActivity) getKeyboard() tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, action := range ua.possible_actions {
-
-		//buttonData := fmt.Sprintf("%s_%s", ua.actionType, strings.Split(action, " ")[0])
 		buttonData := strings.Split(action, " ")[0]
 		row := tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(action, buttonData),
 		)
 		rows = append(rows, row)
 	}
+	// TODO: send success to user
 	return tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
@@ -106,7 +92,6 @@ func NewBabyActivity() *babyActivity {
 		"add baby":     "<name> <date_of_birth>\ndate_of_birth in format YYYY-MM-DD",
 		"current baby": "<number_of_baby>",
 		"remove baby":  "<number_of_baby",
-		"view baby":    "",
 	}
 	return a
 }
@@ -131,71 +116,119 @@ func NewStateActivity() *stateActivity {
 	return a
 }
 
-func (ea eventActivity) doActivity(args string) error {
+func (ea eventActivity) doActivity(args ...string) (string, error) {
+	fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
+		ea.actionType, ea.action, args)
 	switch ea.action {
 	case "add":
 		{
-			fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
-				ea.actionType, ea.action, args)
 		}
 	case "today":
 		{
-			fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
-				ea.actionType, ea.action, args)
 		}
 
 	}
 
-	return nil
+	return "", nil
 }
-func (ba babyActivity) doActivity(args string) error {
+func (ba babyActivity) doActivity(args ...string) (string, error) {
+	fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
+		ba.actionType, ba.action, args)
+	//first arg is parentId
+	var result string
+	parentId, err := strconv.Atoi(args[0])
+	if err != nil {
+		fmt.Printf("error on convert pid to string:\n%s", err)
+		return result, err
+	}
 	switch ba.action {
 	case "add":
 		{
-			fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
-				ba.actionType, ba.action, args)
+			//args is ParentId;<name>;<date_of_birth>(in format YYYY-MM-DD);,
+			baby := newBaby()
+			if len(args) < 3 {
+				return result, fmt.Errorf("error, baby format must be <name> <birth_date>")
+			}
+			splittedDate := strings.Split(args[1], "-")
+			year, yerr := strconv.Atoi(splittedDate[0])
+			month, merr := strconv.Atoi(splittedDate[1])
+			day, derr := strconv.Atoi(splittedDate[2])
+
+			if yerr != nil || merr != nil || derr != nil {
+				fmt.Printf("Error on reading date")
+				return result, fmt.Errorf("%s, %s, %s", yerr, merr, derr)
+			}
+			baby.SetBirth(time.Date(year, time.Month(month+1), day, 0, 0, 0, 0, time.UTC))
+
+			baby.SetParent(int64(parentId))
+			baby.SetName(args[0])
+			if err := baby.writeStructToBase(); err != nil {
+				fmt.Printf("Error on writing new baby to base:\n%s", err)
+				return result, err
+			}
+			result = fmt.Sprintf("Baby %s successfully writed to base", baby)
+			fmt.Println(result)
 		}
 	case "current":
 		{
-			fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
-				ba.actionType, ba.action, args)
+			//arg is ParentId
+			currentBaby, err := GetParentCurrentBaby(int64(parentId))
+			if err != nil {
+				return result, err
+			}
+			result = fmt.Sprintf("Current baby is %s", currentBaby)
+			fmt.Println(result)
+
 		}
 	case "remove":
 		{
-			fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
-				ba.actionType, ba.action, args)
-		}
-	case "view":
-		{
-			fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
-				ba.actionType, ba.action, args)
+			if len(args) < 2 {
+				return result, fmt.Errorf("error, not receive baby number")
+			}
+			//args is parentId;baby number
+			babyes, err := GetBabyesByParent(int64(parentId))
+			if err != nil {
+				return result, err
+			}
+			babyNumber, err := strconv.Atoi(args[1])
+			if err != nil {
+				return result, err
+			}
+			if len(babyes) < babyNumber {
+				return result, fmt.Errorf("error, checked not existing baby")
+			}
+			if err := removeBabyFromBase(babyes[babyNumber-1].Id()); err != nil {
+				return result, err
+			}
+			result = fmt.Sprintf("Baby %s remove from base", babyes[babyNumber-1])
+			fmt.Println(result)
+			// TODO: set current to zero if it removed
+
 		}
 	}
-	// validate args
-
-	return nil
+	return result, nil
 }
-func (sa stateActivity) doActivity(args string) error {
+
+func (sa stateActivity) doActivity(args ...string) (string, error) {
 	// validate args
+	var result string
+
+	fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
+		sa.actionType, sa.action, args)
 	switch sa.action {
 	case "today":
 		{
-			fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
-				sa.actionType, sa.action, args)
 		}
 	case "week":
 		{
-			fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
-				sa.actionType, sa.action, args)
 		}
 	case "month":
 		{
-			fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
-				sa.actionType, sa.action, args)
 		}
 	}
+	result = fmt.Sprintf("Result for %s state", sa.action)
 
-	return nil
+	return result, nil
 }
 
 var eventNumericKeyboard = tgbotapi.NewReplyKeyboard(
@@ -284,7 +317,11 @@ func telegramBot() {
 								message = "Вы еще не зарегистрировали ребенка. Сделайте это, нажав на соответствующую кнопку"
 
 							} else {
-								message = fmt.Sprintf("Ваши дети:\n%s\n", babyes)
+								message = fmt.Sprintf("Ваши дети:\n")
+								for counter, baby := range babyes {
+									message = fmt.Sprintf("%s  %d\t%s", message, counter+1, baby)
+								}
+
 							}
 
 							msg = tgbotapi.NewMessage(update.Message.Chat.ID, message)
@@ -308,10 +345,11 @@ func telegramBot() {
 							text = "Please, select the command:\n/create_event\n/get_state\n/babyes_data"
 						}
 					default: // если же и action был и данные пользователем переданы - выполняем
-						err := UA.doActivity(update.Message.Text)
+						text, err = UA.doActivity(update.Message.Text)
 						if err != nil {
 							fmt.Println(err)
 						}
+
 					}
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, text)
 					if _, err := bot.Send(msg); err != nil {
@@ -321,7 +359,6 @@ func telegramBot() {
 				}
 			}
 		} else if update.CallbackQuery != nil {
-			// TODO: switch for callbacks
 			var msg tgbotapi.MessageConfig
 			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
 			if _, err := bot.Request(callback); err != nil {
@@ -336,6 +373,7 @@ func telegramBot() {
 				continue
 			} else {
 
+				// TODO : проверить что именно приходит клиенту
 				text := fmt.Sprintf("For %s.%s, enter data:\n%s",
 					UA, UA.Action(), UA.Description(UA.Action()))
 				msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, text)
@@ -344,60 +382,6 @@ func telegramBot() {
 					continue
 				}
 			}
-			/*callback_strings := strings.Split(update.CallbackData(), "_")
-			UA.setAction(callback_strings[1])
-			switch callback_strings[0] {
-			case "event":
-				{
-					// если опция add - ждем ввода данных от пользователя
-					// если опция today - делаем запрос событий за сегодня и выводим
-					text := fmt.Sprintf("Type of option is %s, option is %s",
-						callback_strings[0], callback_strings[1])
-					msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, text)
-					currentBotState = waitingEvent
-				}
-			case "state":
-				{
-					// тут в зависимости от опции просто дергаем функции
-					// той или иной выборки и подсчета
-					text := fmt.Sprintf("Type of option is %s, option is %s",
-						callback_strings[0], callback_strings[1])
-					msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, text)
-					currentBotState = waitingState
-
-				}
-			case "baby":
-				{
-					//опция add - ждем вывода данных от пользователя
-					//опция set - ждем вывода данных от пользователя
-					//оция view - запрашиваем данные и выводим
-					//опция remove - ждем ввода данных от пользователя
-					text := fmt.Sprintf("Type of option is %s, option is %s",
-						callback_strings[0], callback_strings[1])
-					msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, text)
-					switch callback_strings[1] {
-					case "add":
-						{
-							currentBotState = waitingBabyAdd
-						}
-					case "set":
-						{
-							currentBotState = waitingBabySet
-						}
-					case "view":
-						{
-						}
-					case "remove":
-						{
-							currentBotState = waitingBabyRemove
-						}
-					}
-
-				}*/
-			// ввод данных - в 		event add
-			//						babyes add
-			//						babyes set
-			//						babyes remove
 
 		}
 
