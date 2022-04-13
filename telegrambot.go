@@ -11,10 +11,15 @@ import (
 )
 
 // TODO: проблема работы с несколькими клиентами вообще. Нужно где-то учитывать статус пользвоателя
-// добавлена doActivity для Baby
-// pampers, eat, sleep структуры и интефрейсы перенесены в events.go
 
-// далее нужны do activiti для event, do activity для state
+// EventActivity меняем - вывод информации по текущему дню можно сделать по умолчанию при
+// выборе соответствующей команды. А inline клавиатуру сделаем позволяющей выбрать тип добавляемого события
+// TODO: нужен маркер для уже идущего сна, который не позволит начать новый, пока не закрыт текущий
+
+//Добавление нового события в список обрабатываемых:
+//	1. вводим его описание в NewEventActivity
+//	2. реализуем для него структуру в events, включая event
+//	3. реализуем добавление в базу и таблицу в базе
 
 type userActivityInterface interface {
 	doActivity(args ...string) (string, error)
@@ -68,10 +73,11 @@ func (a eventActivity) String() string {
 func NewEventActivity() *eventActivity {
 	a := new(eventActivity)
 	a.actionType = "event"
-	a.possible_actions = []string{"add event", "today events"}
+	a.possible_actions = []string{"sleep event", "pampers event", "eat event"}
 	a.description = map[string]string{
-		"add event":    "<event_time>\nevent time in format HH:MM",
-		"today events": "",
+		"sleep event":   "<sleep_time>\nevent time in format hh:mm or YYYY-MM-DD_hh:mm",
+		"eat event":     "<eat_time> description\n<event_time> in format HH:MM, description - любой текст",
+		"pampers event": "<pampers_time> dirty\\wet\\combine\n<event_time> in format HH:MM и тип памперса",
 	}
 	return a
 }
@@ -117,19 +123,85 @@ func NewStateActivity() *stateActivity {
 }
 
 func (ea eventActivity) doActivity(args ...string) (string, error) {
+	// args is <parent_id>;<time>;descr (для всех, кроме sleep)
 	fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
 		ea.actionType, ea.action, args)
-	switch ea.action {
-	case "add":
-		{
-		}
-	case "today":
-		{
-		}
 
+	parentId, err := strconv.Atoi(args[0])
+	if err != nil {
+		return "", err
+	}
+	baby, err := GetParentCurrentBaby(int64(parentId))
+	if err != nil {
+		return "", err
 	}
 
-	return "", nil
+	currentTimeString := args[1]
+
+	if !strings.ContainsAny(currentTimeString, "_") {
+		// если указано только время - получим текущую дату
+		tempTime := time.Now()
+		tempTimeString := fmt.Sprintf("%d-%d-%d_%s",
+			tempTime.Year(), tempTime.Month(), tempTime.Day(), currentTimeString)
+		currentTimeString = tempTimeString
+	}
+
+	eventTime, err := time.Parse("2006-01-02_03:04", currentTimeString)
+	if err != nil {
+		return "", err
+	}
+	var dbEntity eventBaseWorker
+
+	event := newEvent(baby.Id(), eventTime)
+
+	switch ea.action {
+	case "sleep":
+		{
+			dbEntity = newSleep(*event)
+		}
+	case "eat":
+		{
+			eat := newEat(*event)
+			if len(args) == 3 {
+				eat.SetDescription(args[2])
+			}
+			dbEntity = eat
+		}
+	case "pampers":
+		{
+			if len(args) != 3 {
+				return "", fmt.Errorf("please, set type of pampers")
+			}
+			var pSt pampersState
+			switch args[3] {
+			case "dirty":
+				{
+					pSt = dirty
+				}
+			case "wet":
+				{
+					pSt = wet
+				}
+			case "combine":
+				{
+					pSt = combined
+				}
+			default:
+				{
+					return "", fmt.Errorf("wrong type of pampers. must be dirty\\wet\\combine")
+				}
+			}
+			pampers := newPampers(*event)
+			pampers.SetState(pSt)
+			dbEntity = pampers
+		}
+	}
+	if err := dbEntity.writeStructToBase(); err != nil {
+		return "", err
+	}
+	resultString := fmt.Sprintf("%s in %s successfully added to base",
+		ea.actionType, event.Start())
+	return resultString, err
 }
 func (ba babyActivity) doActivity(args ...string) (string, error) {
 	fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
@@ -149,6 +221,7 @@ func (ba babyActivity) doActivity(args ...string) (string, error) {
 			if len(args) < 3 {
 				return result, fmt.Errorf("error, baby format must be <name> <birth_date>")
 			}
+			// TODO: time.Parse!!!!!!!!!!!!!!!!!!1
 			splittedDate := strings.Split(args[1], "-")
 			year, yerr := strconv.Atoi(splittedDate[0])
 			month, merr := strconv.Atoi(splittedDate[1])
@@ -202,7 +275,7 @@ func (ba babyActivity) doActivity(args ...string) (string, error) {
 			}
 			result = fmt.Sprintf("Baby %s remove from base", babyes[babyNumber-1])
 			fmt.Println(result)
-			// TODO: set current to zero if it removed
+			// TODO: set current baby to zero if it removed
 
 		}
 	}
