@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+//переделал конструктор событий
+// методы GetTypedEventsIdsByBabyDate GetEventsByBabyDate GetNotEndedSleepForBaby
+// removed testdata, crates event_test
 var dbInfo = "host=127.0.0.1 port=5432 user=postgres password=!QAZxsw2 dbname=test_db"
 
 // TODO: стоит подумать о том, чтобы сделать одну большую таблицу EVENTS
@@ -15,6 +18,7 @@ var dbInfo = "host=127.0.0.1 port=5432 user=postgres password=!QAZxsw2 dbname=te
 // добирать из базы "дополнительные" данные для него.
 // сейчас же мы делаем два запроса из одной из той же таблицы - сначала заполняя
 // структуру event, уже потом заполняя дополнительные данные
+// TODO: нужно ли, может, удалить??? или наоборот - внедрить всюду?
 type DBEventQuery struct {
 	table  string
 	babyId int64
@@ -72,6 +76,7 @@ func DBReadRows(queryString string) (*sql.Rows, error) {
 
 }
 
+// TODO: REMOVE IT!!!!!!!!!!!!!!!!!
 //receive eventI from table of event type. Then, receive
 func SelectEventByBabyDate(queryData DBEventQuery) ([]eventI, error) {
 	var results []eventI
@@ -99,7 +104,8 @@ func SelectEventByBabyDate(queryData DBEventQuery) ([]eventI, error) {
 			fmt.Println(err)
 			return nil, err
 		}
-		currentEvent := newEvent(babyId, startTime)
+		currentEvent := newEvent(babyId)
+		currentEvent.SetStart(startTime)
 
 		results = append(results, currentEvent)
 	}
@@ -195,18 +201,113 @@ func GetParentCurrentBaby(parentId int64) (babyI, error) {
 	return b, nil
 }
 
-func GetBabyesEventsByDate(id int64, t time.Time) ([]eventI, error) {
-	/* query_string := fmt.Sprintf("select (baby_id, start, sleep_end) "+
-	"from sleep where sleep_start > '%s' and sleep_start < ('%s' + '1 day'::interval",
-	date, date) */
-	return nil, nil
+func GetTypedEventsIdsByBabyDate(babyId int64, t time.Time, tableName string) ([]int64, error) {
+	var results []int64
+	queryString := fmt.Sprintf("select id from %s where baby_id = %d and start > '%s",
+		tableName, babyId, t.Format("2006-01-02"))
+
+	rows, err := DBReadRows(queryString)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var eventId int64
+	for rows.Next() {
+		if err := rows.Scan(&eventId); err != nil {
+			break
+		}
+		results = append(results, eventId)
+	}
+
+	return results, nil
 }
 
-func removeBabyFromBase(babyId int64) error {
+func GetEventsByBabyDate(babyId int64, t time.Time) []eventI {
+	var resultTables []eventI
+	eventsTables := []string{"sleep", "eat", "pampers"}
+	for _, table := range eventsTables {
+		idsList, err := GetTypedEventsIdsByBabyDate(babyId, t, table)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		for _, eventId := range idsList {
+
+			nEvent := newEvent(babyId)
+
+			// TODO: вот прямо испытываю ощущение что ту можно сделать гораздо лучше
+			// TODO: пожалуй, можно вообще не слайс объектов возвращать, а тупо слайс строк
+			// тогда этот код совсем упростится
+			switch table {
+			case "sleep":
+				{
+					nSleep := newSleep(*nEvent)
+					if err := nSleep.readStructFromBase(eventId); err != nil {
+						fmt.Println(err)
+						continue
+					}
+					resultTables = append(resultTables, nSleep)
+				}
+			case "eat":
+				{
+					nEat := newEat(*nEvent)
+					if err := nEat.readStructFromBase(eventId); err != nil {
+						fmt.Println(err)
+						continue
+					}
+					resultTables = append(resultTables, nEat)
+
+				}
+			case "pampers":
+				{
+					nPampers := newPampers(*nEvent)
+					if err := nPampers.readStructFromBase(eventId); err != nil {
+						fmt.Println(err)
+						continue
+					}
+					resultTables = append(resultTables, nPampers)
+				}
+
+				// хотим для id каждого типа создать объект соотв типа и добавить
+				// в слайс eventI
+
+			}
+		}
+
+	}
+	return resultTables
+}
+
+func RemoveBabyFromBase(babyId int64) error {
 	queryString := fmt.Sprintf("delete from baby where baby_id = %d", babyId)
 	_, err := DBReadRow(queryString)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func GetNotEndedSleepForBaby(babyId int64) (sleepI, error) {
+	queryString := fmt.Sprintf("select id from sleep where (sleep_end is null) AND (baby_id = %d);",
+		babyId)
+	row, err := DBReadRow(queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	var notEndedSleepId int64
+	err = row.Scan(&notEndedSleepId)
+	if err.Error() == "sql: no rows in result set" {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	var sleep sleepI
+	if err := sleep.readStructFromBase(notEndedSleepId); err != nil {
+		return nil, err
+	}
+
+	return sleep, nil
+
 }

@@ -14,7 +14,10 @@ import (
 
 // EventActivity меняем - вывод информации по текущему дню можно сделать по умолчанию при
 // выборе соответствующей команды. А inline клавиатуру сделаем позволяющей выбрать тип добавляемого события
-// TODO: нужен маркер для уже идущего сна, который не позволит начать новый, пока не закрыт текущий
+// добавлена проверка уже идущего сна, которая в любом случае даст команду на завершение
+// предыдущего, прежде чем можно будет ввести новый
+// добавлено получение и вывод всех событий при выборе команды событий (с проверкой выборки
+// актуального ребенка)
 
 //Добавление нового события в список обрабатываемых:
 //	1. вводим его описание в NewEventActivity
@@ -131,8 +134,9 @@ func (ea eventActivity) doActivity(args ...string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	baby, err := GetParentCurrentBaby(int64(parentId))
+	baby, err := GetCurrentBaby(int64(parentId))
 	if err != nil {
+		err := fmt.Errorf("Error getting current baby: %s", err)
 		return "", err
 	}
 
@@ -152,12 +156,21 @@ func (ea eventActivity) doActivity(args ...string) (string, error) {
 	}
 	var dbEntity eventBaseWorker
 
-	event := newEvent(baby.Id(), eventTime)
+	event := newEvent(baby.Id())
+	event.SetStart(eventTime)
 
 	switch ea.action {
 	case "sleep":
 		{
-			dbEntity = newSleep(*event)
+			sleep, err := GetNotEndedSleepForBaby(baby.Id())
+			if err != nil {
+				return "", err
+			}
+			if sleep != nil {
+				sleep.setEndTime(event.Start())
+			} else {
+				dbEntity = newSleep(*event)
+			}
 		}
 	case "eat":
 		{
@@ -192,7 +205,7 @@ func (ea eventActivity) doActivity(args ...string) (string, error) {
 				}
 			}
 			pampers := newPampers(*event)
-			pampers.SetState(pSt)
+			pampers.setState(pSt)
 			dbEntity = pampers
 		}
 	}
@@ -203,6 +216,7 @@ func (ea eventActivity) doActivity(args ...string) (string, error) {
 		ea.actionType, event.Start())
 	return resultString, err
 }
+
 func (ba babyActivity) doActivity(args ...string) (string, error) {
 	fmt.Printf("in \"doActivity\" method of action %s. Action is %s, args %#v",
 		ba.actionType, ba.action, args)
@@ -221,17 +235,12 @@ func (ba babyActivity) doActivity(args ...string) (string, error) {
 			if len(args) < 3 {
 				return result, fmt.Errorf("error, baby format must be <name> <birth_date>")
 			}
-			// TODO: time.Parse!!!!!!!!!!!!!!!!!!1
-			splittedDate := strings.Split(args[1], "-")
-			year, yerr := strconv.Atoi(splittedDate[0])
-			month, merr := strconv.Atoi(splittedDate[1])
-			day, derr := strconv.Atoi(splittedDate[2])
-
-			if yerr != nil || merr != nil || derr != nil {
+			t, err := time.Parse("2006-01-02", args[1])
+			if err != nil {
 				fmt.Printf("Error on reading date")
-				return result, fmt.Errorf("%s, %s, %s", yerr, merr, derr)
+				return result, err
 			}
-			baby.SetBirth(time.Date(year, time.Month(month+1), day, 0, 0, 0, 0, time.UTC))
+			baby.SetBirth(t)
 
 			baby.SetParent(int64(parentId))
 			baby.SetName(args[0])
@@ -245,7 +254,7 @@ func (ba babyActivity) doActivity(args ...string) (string, error) {
 	case "current":
 		{
 			//arg is ParentId
-			currentBaby, err := GetParentCurrentBaby(int64(parentId))
+			currentBaby, err := GetCurrentBaby(int64(parentId))
 			if err != nil {
 				return result, err
 			}
@@ -270,11 +279,12 @@ func (ba babyActivity) doActivity(args ...string) (string, error) {
 			if len(babyes) < babyNumber {
 				return result, fmt.Errorf("error, checked not existing baby")
 			}
-			if err := removeBabyFromBase(babyes[babyNumber-1].Id()); err != nil {
+			if err := RemoveBabyFromBase(babyes[babyNumber-1].Id()); err != nil {
 				return result, err
 			}
 			result = fmt.Sprintf("Baby %s remove from base", babyes[babyNumber-1])
 			fmt.Println(result)
+
 			// TODO: set current baby to zero if it removed
 
 		}
@@ -361,15 +371,27 @@ func telegramBot() {
 							fmt.Println(err)
 							continue
 						}
-						message := fmt.Sprintf("hello, %s!\nТы можешь:\n\tработать с событиями через /create_event\nуправлять детьми через /babyes_data\n\tполучить статистику через /get_state", update.Message.From.FirstName)
+						message := fmt.Sprintf("hello, %s!\nВы можете:\n\tработать с событиями через /create_event\nуправлять детьми через /babyes_data\n\tполучить статистику через /get_state", update.Message.From.FirstName)
 						msg = tgbotapi.NewMessage(update.Message.Chat.ID, message)
-						//msg.ReplyMarkup = mainMenuKeyboard
 
 					case "create_event":
 						{
-							// TODO: можно сразу выводить действия за сегодня
+							// получим текущего ребенка родителя, и все события за сегодня
+							// для него
+							currentBaby, err := GetCurrentBaby(parentId)
+							if err != nil {
+								msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Сначала выберете ребенка")
+								break
+								// TODO: break из switch выходит?
+							}
+							events := GetEventsByBabyDate(currentBaby.Id(), time.Now())
+							text := "События за сегодня:\n"
+							for _, e := range events {
+								text = fmt.Sprintf("%s\t- %s\n", text, e)
+							}
+							text = fmt.Sprintf("%s\nВыберите действие:")
 							UA = NewEventActivity()
-							msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Выберите действие")
+							msg = tgbotapi.NewMessage(update.Message.Chat.ID, text)
 							msg.ReplyMarkup = UA.getKeyboard()
 						}
 					case "get_state":

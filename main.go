@@ -27,6 +27,7 @@ TODO:
 
 func main() {
 
+	//CreatingData()
 	telegramBot()
 	// создал RegisterNewParent с возвратом родителя (созданного, или существующего)
 	// создал GetBabyesByParent c возвратом всех детей родителя
