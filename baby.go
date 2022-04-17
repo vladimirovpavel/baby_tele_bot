@@ -69,6 +69,7 @@ func (b *baby) readStructFromBase(id int64) error {
 		return err
 	}
 
+	b.id = id
 	b.parentId = parentId
 	b.name = name
 	b.birth = birth

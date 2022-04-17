@@ -1,9 +1,12 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"time"
 )
+
+// TODO: все NEW можно переделать на пустой констурктор, уже затем давать им event
 
 //----------------------EVENT interface-----------------------
 type eventI interface {
@@ -15,6 +18,8 @@ type eventI interface {
 
 	String() string
 
+	CheckExisting(table string, id int64) bool
+
 	//SelectByBabyDate(queryParam []string) eventI
 }
 
@@ -24,8 +29,8 @@ type event struct {
 }
 
 // RETURNS POINTER TO EVENT!!!!!!
-func newEvent(b_id int64, t time.Time) *event {
-	e := event{babyId: b_id, start: t}
+func newEvent(b_id int64) *event {
+	e := event{babyId: b_id}
 	return &e
 }
 
@@ -46,13 +51,29 @@ func (e event) String() string {
 	return fmt.Sprintf("Event of baby %d, started ad %s", e.babyId, e.Start().Format(("2006-01-02")))
 }
 
+func (e event) CheckExisting(table string, id int64) bool {
+	queryString := fmt.Sprintf("select id from %s where id = %d", table, id)
+	row, err := DBReadRow(queryString)
+	if err != nil {
+		return false
+	}
+	var i int
+	if err := row.Scan(&i); err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return false
+		}
+	}
+	return true
+}
+
 //-------------------------------SLEEP interfaces ------------------------
 
 //----------------------SLEEP interface-----------------------
 type sleepI interface {
 	eventBaseWorker
 	eventI
-	setEndTime(time.Time)
+	SetId(int64)
+	SetEndTime(time.Time)
 	updateEndSleepTime() error
 	calcDuration()
 
@@ -90,48 +111,69 @@ func (s *sleep) readStructFromBase(id int64) error {
 	/* query_string := fmt.Sprintf("select (baby_id, start, sleep_end) "+
 	"from sleep where sleep_start > '%s' and sleep_start < ('%s' + '1 day'::interval",
 	date, date) */
-	query_string := fmt.Sprintf("select (baby_id, start, sleep_end) "+
+	query_string := fmt.Sprintf("select baby_id, start, sleep_end "+
 		"from sleep where id = %d", id)
-
+	// TODO: может, принимать в строку и парсить в time уже потом?
 	row, err := DBReadRow(query_string)
 	if err != nil {
 		return err
 	}
 	var babyId int64
 	var start time.Time
-	var sleepEnd time.Time
+	//var sleepEnd time.Time
+	var sleepEnd sql.NullTime
 	if err := row.Scan(&babyId, &start, &sleepEnd); err != nil {
 		return err
 	}
+	s.SetId(id)
 	s.SetBabyId(babyId)
 	s.SetStart(start)
-	s.setEndTime(sleepEnd)
+	s.SetEndTime(sleepEnd.Time)
 
 	return nil
 }
 
 func (s *sleep) writeStructToBase() error {
-	query_string := fmt.Sprintf("insert into sleep (baby_id, start) "+
-		"values (%d, '%s') RETURNING id", s.BabyId(), s.Start().Format("2006-01-02 03:04"))
-	fmt.Println(query_string)
-	pIdRow, err := DBInsertAndGet(query_string)
-	if err != nil {
-		return err
+	// at first, check existing current event in base.
+	// if exists - update, not insert
+	existing := s.CheckExisting("sleep", s.id)
+	var queryString string
+	if existing {
+		queryString = fmt.Sprintf("update sleep set (sleep_end) "+
+			"= ROW('%s') where id = %d", s.endTime.Format("2006-01-02 03:04"), s.id)
+	} else {
+		queryString = fmt.Sprintf("insert into sleep (baby_id, start) "+
+			"values (%d, '%s') RETURNING id", s.BabyId(), s.Start().Format("2006-01-02 03:04"))
 	}
 
-	var sleepId int64
-
-	err = pIdRow.Scan(&sleepId)
+	fmt.Println(queryString)
+	pIdRow, err := DBInsertAndGet(queryString)
 	if err != nil {
-		return err
+		if existing && err.Error() == "sql: no rows in result set" {
+		} else {
+			return err
+		}
 	}
-	s.id = sleepId
+
+	if !existing {
+		var sleepId int64
+
+		err = pIdRow.Scan(&sleepId)
+		if err != nil {
+			return err
+		}
+		s.id = sleepId
+	}
 	return nil
 }
 
-func (s *sleep) setEndTime(t time.Time) {
+func (s *sleep) SetEndTime(t time.Time) {
 	s.endTime = t
 	s.calcDuration()
+}
+
+func (s *sleep) SetId(id int64) {
+	s.id = id
 }
 
 func (s *sleep) calcDuration() {
@@ -163,6 +205,7 @@ type pampersI interface {
 	eventBaseWorker
 	eventI
 	SetState(pampersState)
+	SetId(int64)
 
 	Id() int64
 	State() pampersState
@@ -180,10 +223,18 @@ func newPampers(initEvent event) *pampers {
 }
 
 func (p *pampers) writeStructToBase() error {
-	query_string := fmt.Sprintf("insert into pampers(baby_id, start, state) "+
-		"values(%d, '%s', %d) RETURNING id", p.BabyId(), p.Start().Format("2006-01-02"), p.State())
+	existing := p.CheckExisting("pampers", p.id)
+	var queryString string
+	if existing {
+		queryString = fmt.Sprintf("update pampers set (baby_id, start, state) "+
+			"values(%d, '%s', %d) where id = %d", p.babyId, p.start, p.state, p.id)
+	} else {
 
-	pIdRow, err := DBInsertAndGet(query_string)
+		queryString = fmt.Sprintf("insert into pampers(baby_id, start, state) "+
+			"values(%d, '%s', %d) RETURNING id", p.BabyId(), p.Start().Format("2006-01-02"), p.State())
+	}
+	fmt.Println(queryString)
+	pIdRow, err := DBInsertAndGet(queryString)
 	if err != nil {
 		return err
 	}
@@ -215,6 +266,7 @@ func (p *pampers) readStructFromBase(id int64) error {
 	p.SetBabyId(babyId)
 	p.SetStart(start)
 	p.SetState(state)
+	p.SetId(id)
 
 	return nil
 
@@ -222,6 +274,10 @@ func (p *pampers) readStructFromBase(id int64) error {
 
 func (p *pampers) SetState(ps pampersState) {
 	p.state = ps
+}
+
+func (p *pampers) SetId(id int64) {
+	p.id = id
 }
 
 func (p pampers) State() pampersState {
@@ -237,6 +293,7 @@ type eatI interface {
 	eventBaseWorker
 	eventI
 	SetDescription(string)
+	SetId(int64)
 
 	Id() int64
 	Description() string
@@ -265,10 +322,18 @@ func (e eat) Id() int64 {
 }
 
 func (e *eat) writeStructToBase() error {
-	query_string := fmt.Sprintf("insert into eat(baby_id, start, description) "+
-		"VALUES (%d, '%s', '%s') RETURNING id;",
-		e.event.BabyId(), e.event.Start().Format("2006-01-02"), e.Description())
-	row, err := DBInsertAndGet(query_string)
+	existing := e.CheckExisting("eat", e.id)
+	var queryString string
+	if existing {
+		queryString = fmt.Sprintf("update eat set (baby_id, start, description) "+
+			"= (%d, '%s', '%s') where id = %d", e.babyId, e.start, e.description, e.id)
+	} else {
+
+		queryString = fmt.Sprintf("insert into eat(baby_id, start, description) "+
+			"VALUES (%d, '%s', '%s') RETURNING id;",
+			e.event.BabyId(), e.event.Start().Format("2006-01-02"), e.Description())
+	}
+	row, err := DBInsertAndGet(queryString)
 	if err != nil {
 		return err
 	}
@@ -301,6 +366,11 @@ func (e *eat) readStructFromBase(id int64) error {
 	e.SetBabyId(babyId)
 	e.SetStart(start)
 	e.SetDescription(description)
+	e.SetId(id)
 
 	return nil
+}
+
+func (e *eat) SetId(id int64) {
+	e.id = id
 }

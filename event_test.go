@@ -83,11 +83,11 @@ func createTestData() {
 	eats = append(eats, ea1, ea2, ea3)
 
 	pamp1 := newPampers(*event5)
-	pamp1.setState(dirty)
+	pamp1.SetState(dirty)
 	pamp2 := newPampers(*event8)
-	pamp2.setState(dirty)
+	pamp2.SetState(dirty)
 	pamp3 := newPampers(*event9)
-	pamp3.setState(dirty)
+	pamp3.SetState(dirty)
 
 	var pampers []pampersI
 	pampers = append(pampers, pamp1, pamp2, pamp3)

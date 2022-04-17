@@ -33,11 +33,29 @@ func newParent() *parent {
 }
 
 func (p *parent) writeStructToBase() error {
-	queryString := fmt.Sprintf("insert into parent(parent_id, name) "+
-		"values('%d', '%s') RETURNING parent_id", p.Id(), p.Name())
+	// checks existing parent in base. If exists - not INSERT, UPDATE
+	queryString := fmt.Sprintf("select parent_id from parent where parent_id=%d", p.id)
+
+	row, err := DBReadRow(queryString)
+	if err != nil {
+		return err
+	}
+
+	var id string
+	if err := row.Scan(&id); err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			queryString = fmt.Sprintf("insert into parent(parent_id, name, current_baby) "+
+				"values('%d', '%s', '%d') RETURNING parent_id", p.Id(), p.Name(), p.currentBaby)
+		} else {
+			return err
+		}
+	} else {
+		queryString = fmt.Sprintf("update parent set (name, current_baby) "+
+			"= ('%s', %d) where parent_id = %d", p.Name(), p.CurrentBaby(), p.Id())
+	}
 
 	//pIdRow, err := DBInsertAndGet(query)
-	_, err := DBInsertAndGet(queryString)
+	_, err = DBInsertAndGet(queryString)
 	if err != nil {
 		return err
 	}

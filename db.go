@@ -44,7 +44,7 @@ func DBInsertAndGet(queryString string) (*sql.Row, error) {
 	}
 	defer db.Close()
 	result := db.QueryRow(queryString)
-	return result, nil
+	return result, result.Err()
 	// TODO: case data inserged, but id not received
 
 }
@@ -181,7 +181,7 @@ func GetBabyesByParent(parentId int64) ([]babyI, error) {
 	return babyes, err
 }
 
-func GetParentCurrentBaby(parentId int64) (babyI, error) {
+func GetCurrentBaby(parentId int64) (babyI, error) {
 	queryString := fmt.Sprintf("select current_baby from parent where parent_id = %d", parentId)
 	row, err := DBReadRow(queryString)
 	if err != nil {
@@ -190,7 +190,7 @@ func GetParentCurrentBaby(parentId int64) (babyI, error) {
 
 	var baby_id int64
 
-	if err := row.Scan(&baby_id); err != nil {
+	if err := row.Scan(&baby_id); err != nil || baby_id == 0 {
 		return nil, err
 	}
 	b := newBaby()
@@ -298,16 +298,20 @@ func GetNotEndedSleepForBaby(babyId int64) (sleepI, error) {
 
 	var notEndedSleepId int64
 	err = row.Scan(&notEndedSleepId)
-	if err.Error() == "sql: no rows in result set" {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil, nil
+		} else {
+			return nil, err
+		}
 	}
-	var sleep sleepI
-	if err := sleep.readStructFromBase(notEndedSleepId); err != nil {
+	var s = newSleep(*newEvent(babyId))
+	// TODO: !!!!!!!!!!!!!!!! проблема в том, что при чтении свежесозданного события
+	// TODO: не читается null конец события
+	if err := s.readStructFromBase(notEndedSleepId); err != nil {
 		return nil, err
 	}
 
-	return sleep, nil
+	return s, nil
 
 }
