@@ -1,18 +1,9 @@
 package main
 
-//added keyboards and inline keyboards
-//added callback to update chan cycle
+import "go.uber.org/zap"
 
-// СЛЕДУЮЩЕЕ
-/*
-4.1. в разделе set event должна быть возможность завершить начатый сон
-4.2. то есть должна быть возможность узнать что сон сейчас идет
-
-5. на основе данных с клавиатур - должен создаваться и добавлятсья в базу объект
-	соответствующего типа
-6. кнопки поулчения данных должны получать дату, на которую получаются события
-6.1. запрашивать события из базы и выводить их
-*/
+var logger = zap.NewExample()
+var slogger = logger.Sugar()
 
 /*
 TODO:
@@ -28,6 +19,7 @@ TODO:
 func main() {
 
 	//CreatingData()
+	slogger.Infof("create telegrambot")
 	telegramBot()
 	// создал RegisterNewParent с возвратом родителя (созданного, или существующего)
 	// создал GetBabyesByParent c возвратом всех детей родителя

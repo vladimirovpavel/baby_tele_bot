@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -33,6 +32,16 @@ func (eventQuery DBEventQuery) String() string {
 type eventBaseWorker interface {
 	writeStructToBase() error
 	readStructFromBase(id int64) error
+}
+
+func DBDeleteData(queryString string) error {
+	db, err := sql.Open("pgx", dbInfo)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	result := db.QueryRow(queryString)
+	return result.Err()
 }
 
 func DBInsertAndGet(queryString string) (*sql.Row, error) {
@@ -73,52 +82,9 @@ func DBReadRows(queryString string) (*sql.Rows, error) {
 		return nil, err
 	}
 	return result, nil
-
 }
 
-// TODO: REMOVE IT!!!!!!!!!!!!!!!!!
-//receive eventI from table of event type. Then, receive
-func SelectEventByBabyDate(queryData DBEventQuery) ([]eventI, error) {
-	var results []eventI
-
-	queryString := fmt.Sprintf("select id, baby_id, start from %s where baby_id=%d and start > '%s';",
-		queryData.table, queryData.babyId, queryData.start.Format("2006-01-02"))
-	rows, err := DBReadRows(queryString)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var eventId int64
-		var babyId int64
-		var start string
-		if err := rows.Scan(&eventId, &babyId, &start); err != nil {
-			fmt.Println(err)
-			break
-		}
-		splittedDate := strings.Split(start, "T")
-		startTime, err := time.Parse("2006-01-02", splittedDate[0])
-		if err != nil {
-			fmt.Println(err)
-			return nil, err
-		}
-		currentEvent := newEvent(babyId)
-		currentEvent.SetStart(startTime)
-
-		results = append(results, currentEvent)
-	}
-
-	return results, err
-
-}
-
-// Регистрация нового родителя. проверяем - есть ли уже в базе запись о родителе,
-// если есть - вернем уже существующую структуру
-// если нет - создади запись и вернем структуру
 func RegisterNewParent(parentId int64, parentName string) (*parent, error) {
-	//проверяем - не существует ли родитель в настоящий момент
 	queryString := fmt.Sprintf("select parent_id from parent where parent_id = %d", parentId)
 	row, err := DBReadRow(queryString)
 	if err != nil {
@@ -153,57 +119,11 @@ func RegisterNewParent(parentId int64, parentName string) (*parent, error) {
 
 	}
 	return p, nil
-
-}
-
-func GetBabyesByParent(parentId int64) ([]babyI, error) {
-	queryString := fmt.Sprintf("select baby_id from baby where parent_id = %d", parentId)
-
-	rows, err := DBReadRows(queryString)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var babyes []babyI
-	var babyId int64
-	err = nil
-	for rows.Next() {
-		if err := rows.Scan(&babyId); err != nil {
-			break
-		}
-		baby := newBaby()
-		if err := baby.readStructFromBase(babyId); err != nil {
-			fmt.Println(err)
-			continue
-		}
-		babyes = append(babyes, baby)
-	}
-	return babyes, err
-}
-
-func GetCurrentBaby(parentId int64) (babyI, error) {
-	queryString := fmt.Sprintf("select current_baby from parent where parent_id = %d", parentId)
-	row, err := DBReadRow(queryString)
-	if err != nil {
-		return nil, err
-	}
-
-	var baby_id int64
-
-	if err := row.Scan(&baby_id); err != nil || baby_id == 0 {
-		return nil, err
-	}
-	b := newBaby()
-	if err := b.readStructFromBase(baby_id); err != nil {
-		fmt.Printf("Error reading baby for parent %d:\n%s", parentId, err)
-	}
-
-	return b, nil
 }
 
 func GetTypedEventsIdsByBabyDate(babyId int64, t time.Time, tableName string) ([]int64, error) {
 	var results []int64
-	queryString := fmt.Sprintf("select id from %s where baby_id = %d and start > '%s",
+	queryString := fmt.Sprintf("select id from %s where baby_id = %d and start > '%s'",
 		tableName, babyId, t.Format("2006-01-02"))
 
 	rows, err := DBReadRows(queryString)
@@ -279,15 +199,6 @@ func GetEventsByBabyDate(babyId int64, t time.Time) []eventI {
 	return resultTables
 }
 
-func RemoveBabyFromBase(babyId int64) error {
-	queryString := fmt.Sprintf("delete from baby where baby_id = %d", babyId)
-	_, err := DBReadRow(queryString)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func GetNotEndedSleepForBaby(babyId int64) (sleepI, error) {
 	queryString := fmt.Sprintf("select id from sleep where (sleep_end is null) AND (baby_id = %d);",
 		babyId)
@@ -313,5 +224,92 @@ func GetNotEndedSleepForBaby(babyId int64) (sleepI, error) {
 	}
 
 	return s, nil
+}
+
+func RemoveBabyFromBase(babyId int64) error {
+	queryString := fmt.Sprintf("delete from baby where baby_id = %d", babyId)
+	_, err := DBReadRow(queryString)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetBabyesByParent(parentId int64) ([]babyI, error) {
+	queryString := fmt.Sprintf("select baby_id from baby where parent_id = %d", parentId)
+
+	rows, err := DBReadRows(queryString)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var babyes []babyI
+	var babyId int64
+	err = nil
+	for rows.Next() {
+		if err := rows.Scan(&babyId); err != nil {
+			break
+		}
+		baby := newBaby()
+		if err := baby.readStructFromBase(babyId); err != nil {
+			fmt.Println(err)
+			continue
+		}
+		babyes = append(babyes, baby)
+	}
+	return babyes, err
+}
+
+func GetCurrentBaby(parentId int64) (babyI, error) {
+	queryString := fmt.Sprintf("select current_baby from parent where parent_id = %d", parentId)
+	row, err := DBReadRow(queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	var babyId int64
+
+	if err := row.Scan(&babyId); err != nil || babyId == 0 {
+		return nil, err
+	}
+	b := newBaby()
+	if err := b.readStructFromBase(babyId); err != nil {
+		fmt.Printf("Error reading baby for parent %d:\n%s", parentId, err)
+	}
+
+	return b, nil
+}
+
+func GetParentsIds() ([]int64, error) {
+	queryString := "select parent_id from parent"
+	rows, err := DBReadRows(queryString)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	var id int64
+	for rows.Next() {
+		if err := rows.Scan(&id); err != nil {
+			break
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+func CheckParentRegistred(parentId int64) bool {
+	ids, err := GetParentsIds()
+	if err != nil {
+		return false
+	}
+
+	founded := false
+	for _, i := range ids {
+		if int64(parentId) == i {
+			founded = true
+		}
+	}
+	return founded
 
 }
