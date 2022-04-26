@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// TODO: все NEW можно переделать на пустой констурктор, уже затем давать им event
-
 //----------------------EVENT interface-----------------------
 type eventI interface {
 	SetBabyId(int64)

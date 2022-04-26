@@ -54,10 +54,10 @@ func telegramBot() {
 	updates := bot.GetUpdatesChan(u)
 	slogger.Info("bot created and start polling")
 	for update := range updates {
-		slogger.Infof("receive message %s from user %s",
-			update.Message.Text,
-			update.Message.From.ID)
 		if update.Message != nil {
+			slogger.Infof("receive message %s from user %s",
+				update.Message.Text,
+				update.Message.From.ID)
 			var msg tgbotapi.MessageConfig
 
 			if reflect.TypeOf(update.Message.Text).Kind() != reflect.String || update.Message.Text == "" {
@@ -125,11 +125,13 @@ func telegramBot() {
 							if len(babyes) == 0 {
 								message = "Вы еще не зарегистрировали ребенка. Сделайте это, нажав на соответствующую кнопку"
 
+							} else if currentBaby == nil || currentBaby.Id() == 0 {
+								message = "Вам нужно выбрать ребенка"
 							} else {
 								message = fmt.Sprintf("Ваши дети:\n")
 								for counter, baby := range babyes {
 									if baby.Id() == currentBaby.Id() {
-										message = fmt.Sprintf("%s  %d\t**__%s__**", message, counter+1, baby)
+										message = fmt.Sprintf("%s  %d\t **%s** \n", message, counter+1, baby)
 
 									}
 									message = fmt.Sprintf("%s  %d\t%s", message, counter+1, baby)
