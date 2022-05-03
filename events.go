@@ -137,7 +137,7 @@ func (s *sleep) writeStructToBase() error {
 	var queryString string
 	if existing {
 		if s.endTime.IsZero() {
-			queryString = fmt.Sprintf("update sleep set (baby_id, start, sleep_end) "+
+			queryString = fmt.Sprintf("update sleep set (baby_id, start) "+
 				"= (%d, '%s') where id = %d",
 				s.babyId,
 				s.start.Format("2006-01-02 15:04"),

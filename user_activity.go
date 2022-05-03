@@ -39,6 +39,7 @@ func (ua userActivity) getKeyboard() tgbotapi.InlineKeyboardMarkup {
 }
 
 func (ua *userActivity) setAction(action string) {
+
 	ua.action = action
 }
 
@@ -160,6 +161,10 @@ func (ea eventActivity) doActivity(args []string) (string, error) {
 		{
 			sleep, err := GetNotEndedSleepForBaby(baby.Id())
 			if err != nil {
+				slogger.Errorw("error get not ended sleep",
+					"action", ea.action,
+					"error", err.Error(),
+					"user", parentId)
 				return "", err
 			}
 			if sleep != nil {
@@ -182,7 +187,7 @@ func (ea eventActivity) doActivity(args []string) (string, error) {
 	case "pampers":
 		{
 			if len(args) < 3 {
-				return "", fmt.Errorf("please, set type of pampers")
+				return "", fmt.Errorf("пожалуйста, укажите состояние памперса")
 			}
 			var pSt pampersState
 			switch args[2] {
@@ -207,12 +212,24 @@ func (ea eventActivity) doActivity(args []string) (string, error) {
 			pampers.SetState(pSt)
 			dbEntity = pampers
 		}
+	default:
+		{
+			slogger.Errorw("not setted aciton, but doAction",
+				"user", parentId)
+		}
 	}
 	if err := dbEntity.writeStructToBase(); err != nil {
+		slogger.Errorw("error write new action to base",
+			"error", err.Error(),
+			"user", parentId)
 		return "", err
 	}
 	resultString := fmt.Sprintf("%s in %s successfully added to base",
 		ea.actionType, event.Start())
+	slogger.Debugw("action writed to base",
+		"action", ea.actionType,
+		"time", event.Start(),
+		"user", parentId)
 	return resultString, err
 }
 
@@ -251,16 +268,16 @@ func (ba babyActivity) doActivity(args []string) (string, error) {
 			baby.SetParent(int64(parentId))
 			baby.SetName(args[1])
 			if err := baby.writeStructToBase(); err != nil {
-				return result, fmt.Errorf("Error on writing new baby to base:\n%s", err)
+				return result, fmt.Errorf("ошибка на записи ребенка в базу данных:\n%s", err)
 			}
-			result = fmt.Sprintf("Baby %s successfully writed to base", baby)
+			result = fmt.Sprintf("Ребенок %s успешно записан в базу данных", baby)
 			fmt.Println(result)
 		}
 	case "current":
 		{
 			//arg is ParentId, babyNumber
 			if len(args) < 2 {
-				return result, fmt.Errorf("error, not receive baby number")
+				return result, fmt.Errorf("ошибка, не указан номер ребенка")
 			}
 			babyNumber, err := strconv.Atoi(args[1])
 			if err != nil {
@@ -270,8 +287,8 @@ func (ba babyActivity) doActivity(args []string) (string, error) {
 			if err != nil {
 				return result, err
 			}
-			if babyNumber > len(babyes) {
-				return result, fmt.Errorf("error, baby number more then babyes count")
+			if babyNumber > len(babyes) || babyNumber == 0 {
+				return result, fmt.Errorf("ошибка, указан неправильный номер")
 			}
 			neededBaby := babyes[babyNumber-1]
 
@@ -285,14 +302,14 @@ func (ba babyActivity) doActivity(args []string) (string, error) {
 			if err := p.writeStructToBase(); err != nil {
 				return result, err
 			}
-			result = fmt.Sprintf("Baby %s setted as current", neededBaby)
+			result = fmt.Sprintf("Ребенок %s установлен", neededBaby)
 			fmt.Println(result)
 
 		}
 	case "remove":
 		{
 			if len(args) < 2 {
-				return result, fmt.Errorf("error, not receive baby number")
+				return result, fmt.Errorf("ошибка, не указан номер ребенка")
 			}
 			//args is parentId;baby number
 			babyes, err := GetBabyesByParent(int64(parentId))
@@ -303,8 +320,8 @@ func (ba babyActivity) doActivity(args []string) (string, error) {
 			if err != nil {
 				return result, err
 			}
-			if len(babyes) < babyNumber {
-				return result, fmt.Errorf("error, checked not existing baby")
+			if len(babyes) < babyNumber || babyNumber == 0 {
+				return result, fmt.Errorf("ошибка, выбран не существующий ребенок")
 			}
 
 			currentBaby, err := GetCurrentBaby(int64(parentId))
@@ -329,7 +346,7 @@ func (ba babyActivity) doActivity(args []string) (string, error) {
 				return result, err
 			}
 
-			result = fmt.Sprintf("Baby %s removed from base", babyes[babyNumber-1])
+			result = fmt.Sprintf("Ребенок %s удален из базы данных", babyes[babyNumber-1])
 			fmt.Println(result)
 
 		}

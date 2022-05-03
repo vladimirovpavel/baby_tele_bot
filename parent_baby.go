@@ -38,7 +38,7 @@ func (p *parent) writeStructToBase() error {
 
 	row, err := DBReadRow(queryString)
 	if err != nil {
-		return err
+		return fmt.Errorf("error on write parent %d to base:\n%s", p.id, err.Error())
 	}
 
 	var id int64
@@ -47,7 +47,8 @@ func (p *parent) writeStructToBase() error {
 			queryString = fmt.Sprintf("insert into parent(parent_id, name, current_baby) "+
 				"values('%d', '%s', '%d') RETURNING parent_id", p.Id(), p.Name(), p.currentBaby)
 		} else {
-			return err
+			return fmt.Errorf("error on check existing parent %d in base  to base:\n%s",
+				p.id, err.Error())
 		}
 	} else {
 		queryString = fmt.Sprintf("update parent set (name, current_baby) "+
@@ -56,7 +57,7 @@ func (p *parent) writeStructToBase() error {
 
 	_, err = DBInsertAndGet(queryString)
 	if err != nil {
-		return err
+		return fmt.Errorf("error on insert on update or create parent %d:\n%s", p.Id(), err.Error())
 	}
 
 	return nil
@@ -68,13 +69,13 @@ func (p *parent) readStructFromBase(id int64) error {
 
 	row, err := DBReadRow(queryString)
 	if err != nil {
-		return err
+		return fmt.Errorf("error on read data for parent %d:\n%s", p.id, err.Error())
 	}
 
 	var name string
 	var currentBaby int64
 	if err := row.Scan(&name, &currentBaby); err != nil {
-		return err
+		return fmt.Errorf("error on receive data for parent %d:\n%s", p.id, err.Error())
 	}
 
 	p.SetId(id)
@@ -107,7 +108,7 @@ func (p *parent) SetCurrentBaby(id int64) error {
 	if id != 0 {
 		babyes, err := GetBabyesByParent(p.id)
 		if err != nil {
-			return err
+			return fmt.Errorf("error on get babyes by parent %d:\n%s", p.id, err.Error())
 		}
 		founded := false
 		for _, b := range babyes {
@@ -117,7 +118,7 @@ func (p *parent) SetCurrentBaby(id int64) error {
 			}
 		}
 		if !founded {
-			return fmt.Errorf("error, not found your baby")
+			return fmt.Errorf("error, not found baby with id %d", p.id)
 		}
 	}
 	p.currentBaby = id
@@ -255,5 +256,5 @@ func (b *baby) SetId(id int64) {
 }
 
 func (b baby) String() string {
-	return fmt.Sprintf("%s %s", b.Name(), b.Birth())
+	return fmt.Sprintf("%s %s", b.Name(), b.Birth().Format("2006-01-02"))
 }

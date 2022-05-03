@@ -9,7 +9,7 @@ import (
 //переделал конструктор событий
 // методы GetTypedEventsIdsByBabyDate GetEventsByBabyDate GetNotEndedSleepForBaby
 // removed testdata, crates event_test
-var dbInfo = "host=127.0.0.1 port=5432 user=postgres password=!QAZxsw2 dbname=test_db"
+var dbInfo string
 
 // TODO: стоит подумать о том, чтобы сделать одну большую таблицу EVENTS
 // из которой будут идти ссылки на таблицы sleeps, eats, pampers.
@@ -84,11 +84,18 @@ func DBReadRows(queryString string) (*sql.Rows, error) {
 	return result, nil
 }
 
+// функция проверит существование родителя в базе.
+// Если он не существует - создаст его
+// если сущесвует - получит данные из базы и вернет экземпляр
+// возможные ошибки:
+//		ошибка запроса parend id из базы
+//		ошибка заполнения структуры существующего родителя из базы
+// 		ошибка записи свежезарегистрированного родителя в базу
 func RegisterNewParent(parentId int64, parentName string) (*parent, error) {
 	queryString := fmt.Sprintf("select parent_id from parent where parent_id = %d", parentId)
 	row, err := DBReadRow(queryString)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading parent id %d from base:\n%s", parentId, err)
 	}
 	var pId int64
 	var p *parent
@@ -97,13 +104,13 @@ func RegisterNewParent(parentId int64, parentName string) (*parent, error) {
 
 	if err != nil && err.Error() != "sql: no rows in result set" {
 		// ошибка чтения данных из базы, не "НЕТ РЕЛЕВАНТНЫХ СТРОЧЕК"
-		return nil, err
+		return nil, fmt.Errorf("error reading parent id %d from base:\n%s", parentId, err)
 	} else if err == nil { // ошибки нет -> запрос успешен ->  родитель уже в базе
 		fmt.Printf("Parent with id %d and name %s already in base\n", parentId, parentName)
 		p = newParent()
 		err := p.readStructFromBase(parentId)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error reading parent struct for parent id %d from base:\n%s", parentId, err)
 		}
 	} else {
 		//if error == "sql: no rows in result set" - записи в базе нет, родитель
@@ -112,8 +119,7 @@ func RegisterNewParent(parentId int64, parentName string) (*parent, error) {
 		p.SetName(parentName)
 		p.SetId(parentId)
 		if err := p.writeStructToBase(); err != nil {
-			fmt.Println(err)
-			return nil, err
+			return nil, fmt.Errorf("error writing parent struct for id %d  to base:\n%s", parentId, err)
 		}
 		fmt.Printf("Parent with id %d and name %s added to db\n", parentId, parentName)
 
@@ -204,7 +210,7 @@ func GetNotEndedSleepForBaby(babyId int64) (sleepI, error) {
 		babyId)
 	row, err := DBReadRow(queryString)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error get not ended sleep id for baby %d:\n%s", babyId, err.Error())
 	}
 
 	var notEndedSleepId int64
@@ -213,14 +219,14 @@ func GetNotEndedSleepForBaby(babyId int64) (sleepI, error) {
 		if err.Error() == "sql: no rows in result set" {
 			return nil, nil
 		} else {
-			return nil, err
+			return nil, fmt.Errorf("error on receive not ended sleep for baby %d:\n%s", babyId, err.Error())
 		}
 	}
 	var s = newSleep(*newEvent(babyId))
 	// TODO: !!!!!!!!!!!!!!!! проблема в том, что при чтении свежесозданного события
 	// TODO: не читается null конец события
 	if err := s.readStructFromBase(notEndedSleepId); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error on read struct from base for sleep id %d\n%s", notEndedSleepId, err.Error())
 	}
 
 	return s, nil
@@ -230,7 +236,7 @@ func RemoveBabyFromBase(babyId int64) error {
 	queryString := fmt.Sprintf("delete from baby where baby_id = %d", babyId)
 	_, err := DBReadRow(queryString)
 	if err != nil {
-		return err
+		return fmt.Errorf("error on remove baby with id %d from base:\n%s", babyId, err.Error())
 	}
 	return nil
 }
@@ -264,7 +270,7 @@ func GetCurrentBaby(parentId int64) (babyI, error) {
 	queryString := fmt.Sprintf("select current_baby from parent where parent_id = %d", parentId)
 	row, err := DBReadRow(queryString)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error get current baby for parent %d\n%s", parentId, err)
 	}
 
 	var babyId int64
@@ -274,7 +280,7 @@ func GetCurrentBaby(parentId int64) (babyI, error) {
 	}
 	b := newBaby()
 	if err := b.readStructFromBase(babyId); err != nil {
-		fmt.Printf("Error reading baby for parent %d:\n%s", parentId, err)
+		return nil, fmt.Errorf("error reading baby for parent %d:\n%s", parentId, err)
 	}
 
 	return b, nil
@@ -284,7 +290,7 @@ func GetParentsIds() ([]int64, error) {
 	queryString := "select parent_id from parent"
 	rows, err := DBReadRows(queryString)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error on get all parents ids:\n%s", err.Error())
 	}
 	defer rows.Close()
 	var ids []int64

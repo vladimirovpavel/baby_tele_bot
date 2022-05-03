@@ -17,7 +17,7 @@ import (
 //	2. реализуем для него структуру в events, включая event
 //	3. реализуем добавление в базу и таблицу в базе
 
-var eventNumericKeyboard = tgbotapi.NewReplyKeyboard(
+/* var eventNumericKeyboard = tgbotapi.NewReplyKeyboard(
 	tgbotapi.NewKeyboardButtonRow(
 		tgbotapi.NewKeyboardButton("1"),
 		tgbotapi.NewKeyboardButton("2"),
@@ -38,15 +38,18 @@ var eventNumericKeyboard = tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButton("0"),
 		tgbotapi.NewKeyboardButton("."),
 	),
-)
+) */
+
+var token string
 
 func telegramBot() {
 	var UA userActivityInterface
 
 	//bot, err := tgbotapi.NewBotAPI(os.Getenv("TOKEN"))
-	bot, err := tgbotapi.NewBotAPI("5164256009:AAEDA4OGpZTt2CPedXYS7Yn9dj9y86TLH_k")
+	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
-		panic(err)
+		slogger.Error("error connecting to telegram service!")
+		return
 	}
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
@@ -55,31 +58,43 @@ func telegramBot() {
 	slogger.Info("bot created and start polling")
 	for update := range updates {
 		if update.Message != nil {
-			slogger.Infof("receive message %s from user %s",
-				update.Message.Text,
-				update.Message.From.ID)
-			var msg tgbotapi.MessageConfig
+			slogger.Debugw("--receive message",
+				"message", update.Message.Text,
+				"user", update.Message.From.ID,
+				"username", fmt.Sprintf(
+					"%s %s", update.Message.From.FirstName, update.Message.From.LastName))
+			var msgToUser tgbotapi.MessageConfig
 
 			if reflect.TypeOf(update.Message.Text).Kind() != reflect.String || update.Message.Text == "" {
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Use words in request")
-				bot.Send(msg)
+				slogger.Debugw("message not text", "user", update.Message.From.ID)
+				msgToUser = tgbotapi.NewMessage(update.Message.Chat.ID, "Use words in request")
+				bot.Send(msgToUser)
 			} else {
-				fmt.Println(update)
-				fmt.Println(update.Message.Text)
 				parentId := int64(update.Message.From.ID)
 
 				if update.Message.IsCommand() {
+					slogger.Debugw("message is command",
+						"command", update.Message.Command(),
+						"user", update.Message.From.ID)
 					switch update.Message.Command() {
 
 					case "start":
-
+						var text string
 						_, err := RegisterNewParent(parentId, update.Message.From.LastName)
 						if err != nil {
-							fmt.Println(err)
-							continue
+							slogger.Errorw("error register parent",
+								"error", err.Error(),
+								"user", update.Message.From.ID,
+							)
+							text = "Ошибка регистрации вас в системе. Свяжитель с администратором"
+							break
+						} else {
+							text = fmt.Sprintf("hello, %s!\nВы можете:\n\tсоздавать и просматривать события с помощью /create_event\nуправлять детьми через /babyes_data\n\tполучить статистику через /get_state", update.Message.From.FirstName)
+							slogger.Debugw("parent already registred",
+								"user", update.Message.From.ID,
+							)
 						}
-						message := fmt.Sprintf("hello, %s!\nВы можете:\n\tработать с событиями через /create_event\nуправлять детьми через /babyes_data\n\tполучить статистику через /get_state", update.Message.From.FirstName)
-						msg = tgbotapi.NewMessage(update.Message.Chat.ID, message)
+						msgToUser = tgbotapi.NewMessage(update.Message.Chat.ID, text)
 
 					case "create_event":
 						{
@@ -87,10 +102,21 @@ func telegramBot() {
 							// получим текущего ребенка родителя, и все события за сегодня
 							// для него
 							currentBaby, err := GetCurrentBaby(parentId)
-							if err != nil || currentBaby == nil {
-								msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Сначала выберите ребенка в /babyes_data")
+							if err != nil {
+								slogger.Errorw("error get current baby",
+									"error", err.Error(),
+									"user", parentId)
+								msgToUser = tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка при получении ребенка")
+								break
+							} else if currentBaby == nil {
+								slogger.Errorw("try create event without current baby",
+									"error", "no current baby set",
+									"user", parentId)
+								msgToUser = tgbotapi.NewMessage(update.Message.Chat.ID, "Сначала выберите ребенка в /babyes_data")
 								break
 							} else {
+								// TODO: здесь проблема в получении и выводе eventI:
+								// а значит, нет вывода типа конкретного события
 								events := GetEventsByBabyDate(currentBaby.Id(), time.Now())
 								text = "События за сегодня:\n"
 								for _, e := range events {
@@ -99,90 +125,115 @@ func telegramBot() {
 								text = fmt.Sprintf("%s\nВыберите действие:", text)
 								UA = NewEventActivity()
 							}
-							msg = tgbotapi.NewMessage(update.Message.Chat.ID, text)
-							msg.ReplyMarkup = UA.getKeyboard()
+							msgToUser = tgbotapi.NewMessage(update.Message.Chat.ID, text)
+							msgToUser.ReplyMarkup = UA.getKeyboard()
 						}
 					case "get_state":
 						{
 							UA = NewStateActivity()
-							msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Выберите, какая статистика вам нужна")
-							msg.ReplyMarkup = UA.getKeyboard()
+							msgToUser = tgbotapi.NewMessage(update.Message.Chat.ID, "Выберите, какая статистика вам нужна")
+							msgToUser.ReplyMarkup = UA.getKeyboard()
 						}
 					case "babyes_data":
 						{
+							var text string
 							UA = NewBabyActivity()
 							babyes, err := GetBabyesByParent(parentId)
 							if err != nil {
-								fmt.Println(err)
-								continue
+								slogger.Errorw("error get babyes by parent",
+									"error", err.Error(),
+									"user", parentId)
+								break
 							}
 							currentBaby, err := GetCurrentBaby(parentId)
 							if err != nil {
-								fmt.Println(err)
-								continue
+								slogger.Errorw("error get current baby",
+									"error", err.Error(),
+									"user", parentId)
+								break
 							}
-							var message string
 							if len(babyes) == 0 {
-								message = "Вы еще не зарегистрировали ребенка. Сделайте это, нажав на соответствующую кнопку"
+								text = "Вы еще не зарегистрировали ребенка. Сделайте это, нажав на соответствующую кнопку"
 
 							} else if currentBaby == nil || currentBaby.Id() == 0 {
-								message = "Вам нужно выбрать ребенка"
+								text = "Вам нужно выбрать ребенка"
 							} else {
-								message = fmt.Sprintf("Ваши дети:\n")
+								text = "Ваши дети:\n"
 								for counter, baby := range babyes {
 									if baby.Id() == currentBaby.Id() {
-										message = fmt.Sprintf("%s  %d\t **%s** \n", message, counter+1, baby)
+										text = fmt.Sprintf("%s  %d\t **%s** \n", text, counter+1, baby)
 
 									}
-									message = fmt.Sprintf("%s  %d\t%s", message, counter+1, baby)
+									text = fmt.Sprintf("%s  %d\t%s", text, counter+1, baby)
 								}
 
 							}
 
-							msg = tgbotapi.NewMessage(update.Message.Chat.ID, message)
-							msg.ReplyMarkup = UA.getKeyboard()
+							msgToUser = tgbotapi.NewMessage(update.Message.Chat.ID, text)
+							msgToUser.ReplyMarkup = UA.getKeyboard()
 
 						}
 
 					}
-					if _, err := bot.Send(msg); err != nil {
-						fmt.Println(err)
+					if _, err := bot.Send(msgToUser); err != nil {
+						slogger.Errorw("error sending message to user",
+							"error", err.Error(),
+							"user", parentId)
 						continue
 					}
 
 					// если получаем ПРОСТО ТЕКСТ
 				} else {
+					slogger.Debugw("message its just text",
+						"user", parentId)
 					var msg tgbotapi.MessageConfig
 					var text string
 					if UA == nil {
-						text = "Please, select the command:\n/create_event\n/get_state\n/babyes_data"
+						// текст может быть только передачей параметров для выбранного действия.
+						// так что если действие не выбрано - ничего не делаем
+						text = "Пожалуйста, выберите команду:\n/create_event\n/get_state\n/babyes_data"
+						slogger.Debugw("not setted action - no use command",
+							"user", parentId)
 					} else {
-						// если же и action был и данные пользователем переданы - выполняем
-						// для все-таки, видимо, нужен слайс строк с ктнтролем целостности уже внутри
-						// прямо сейчас проблема - при попытке выставить актуального ребенка
-						// передаем больше аргументов, чем есть ( а есть - один, номер ребенка)
-						args := []string{strconv.Itoa(int(parentId))}
-						args = append(args, strings.Split(update.Message.Text, " ")...)
+						// если же действие выбрано, к тексту прикрепляем id пользователя
+						// и отправляем в action.doAction
+						if UA.Action() == "" {
+							text = "Пожалуйста, выберите действие"
+						} else {
+							args := []string{strconv.Itoa(int(parentId))}
+							args = append(args, strings.Split(update.Message.Text, " ")...)
 
-						text, err = UA.doActivity(args)
-						if err != nil {
-							fmt.Println(err)
-							text = err.Error()
+							text, err = UA.doActivity(args)
+							if err != nil {
+								slogger.Errorw("do activity returns a error",
+									"error", err.Error(),
+									"user", parentId)
+								text = err.Error()
+							}
+							UA = nil
+
 						}
-
-						UA = nil
 
 					}
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, text)
 					if _, err := bot.Send(msg); err != nil {
-						fmt.Println(err)
+						slogger.Errorw("error sending message to user",
+							"error", err.Error(),
+							"user", parentId)
 						continue
 					}
 				}
 			}
 		} else if update.CallbackQuery != nil {
+			slogger.Debugw("message is callback",
+				"action", update.CallbackQuery.Data,
+				"user", update.CallbackQuery.From.ID)
+			// TODO: PARSE FROM THIS
+
 			var msg tgbotapi.MessageConfig
-			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, update.CallbackQuery.Data)
+			callback := tgbotapi.NewCallback(
+				update.CallbackQuery.ID,
+				update.CallbackQuery.Data)
 			if _, err := bot.Request(callback); err != nil {
 				fmt.Println(err)
 				continue
@@ -190,18 +241,19 @@ func telegramBot() {
 			var text string
 			if UA != nil {
 				UA.setAction(update.CallbackQuery.Data)
-				//description := UA.Description(UA.Action())
-				//if action without descrition and additional data needed
 
-				// TODO : проверить что именно приходит клиенту
-				text = fmt.Sprintf("For %s.%s, enter data:\n%s",
+				text = fmt.Sprintf("Для действия %s.%s, введите:\n%s",
 					UA, UA.Action(), UA.Description(UA.Action()))
 			} else {
-				text = "Please, at start check command\n"
+				slogger.Debugw("callback without checkec command",
+					"user", update.CallbackQuery.From.ID)
+				text = "Пожалуйста, сначала выберите команду\n"
 			}
 			msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, text)
 			if _, err := bot.Send(msg); err != nil {
-				fmt.Println(err)
+				slogger.Errorw("error sending message to user",
+					"error", err.Error(),
+					"user", update.CallbackQuery.From.ID)
 				continue
 
 			}

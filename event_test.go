@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// замена assert на require
 func getDataForTest() time.Time {
 
 	min := time.Date(1975, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
@@ -65,7 +66,7 @@ func createTestData() {
 	for _, p := range parents {
 		p.writeStructToBase()
 	}
-	var ebw []eventBaseWorker
+	/* var ebw []eventBaseWorker
 	event1 := newEvent(b1.Id())
 	event2 := newEvent(b1.Id())
 	event3 := newEvent(b2.Id())
@@ -120,7 +121,7 @@ func createTestData() {
 
 	for _, e := range ebw {
 		e.writeStructToBase()
-	}
+	} */
 
 }
 
@@ -155,80 +156,80 @@ func TestWriteStructToBaseReadStructFromBase(t *testing.T) {
 
 	// PARENT
 	testParent := newParent()
-	assert.Error(t, testParent.readStructFromBase(-123), "Tests read not existing parent id")
-	assert.NoError(t, testParent.readStructFromBase(1), "Test read existing parent id")
+	require.Error(t, testParent.readStructFromBase(-123), "Tests read not existing parent id")
+	require.NoError(t, testParent.readStructFromBase(1), "Test read existing parent id")
 	require.Equal(t, testParent.name, "TestParent1", "test receive parent name")
 
 	//checks succesfully write parent with new id to base
 	testParent.SetName("NewNameTestParent1")
-	assert.NoError(t, testParent.writeStructToBase(), "Test write parent struct to base")
+	require.NoError(t, testParent.writeStructToBase(), "Test write parent struct to base")
 	testParent2 := newParent()
-	assert.NoError(t, testParent2.readStructFromBase(1), "Test read parent with corret id from base")
+	require.NoError(t, testParent2.readStructFromBase(1), "Test read parent with corret id from base")
 	require.Equal(t, testParent2.name, "NewNameTestParent1", "test succesfylly write and read new ID")
 
 	// BABY
 	//checks get babyes from parent
 	b, err := GetBabyesByParent(testParent2.Id())
-	assert.NoError(t, err, "Tests get babyes by parent")
-	assert.NotEmpty(t, b, "Tests get babyes by parent")
-	assert.Equal(t, len(b), 2, "Test babyes count")
+	require.NoError(t, err, "Tests get babyes by parent")
+	require.NotEmpty(t, b, "Tests get babyes by parent")
+	require.Equal(t, len(b), 2, "Test babyes count")
 
 	//checks read concrete baby and write concrete baby
 	currentBaby := b[0]
-	assert.Error(t, currentBaby.readStructFromBase(-123),
+	require.Error(t, currentBaby.readStructFromBase(-123),
 		"test baby read with wrong id")
-	assert.NoError(t, currentBaby.readStructFromBase(currentBaby.Id()),
+	require.NoError(t, currentBaby.readStructFromBase(currentBaby.Id()),
 		"tests baby read struct")
 
 	currentBaby.SetBirth(getDataForTest())
 	currentBaby.SetName("testsbabyname")
-	assert.Error(t, currentBaby.SetParent(-125))
-	assert.NoError(t, currentBaby.SetParent(testParent.Id()))
+	require.Error(t, currentBaby.SetParent(-125))
+	require.NoError(t, currentBaby.SetParent(testParent.Id()))
 
-	assert.NoError(t, currentBaby.writeStructToBase(), "test write new baby value to base")
+	require.NoError(t, currentBaby.writeStructToBase(), "test write new baby value to base")
 
 	nb := newBaby()
-	assert.NoError(t, nb.readStructFromBase(currentBaby.Id()), "Checks re read writed baby")
-	assert.Equal(t, nb.Id(), currentBaby.Id(), "Check equals writed baby and readed baby")
-	assert.Equal(t, nb.Birth().Format("2006-01-02"), currentBaby.Birth().Format("2006-01-02"), "Check equals writed baby and readed baby")
-	assert.Equal(t, nb.ParentId(), currentBaby.ParentId(), "Check equals writed baby and readed baby")
+	require.NoError(t, nb.readStructFromBase(currentBaby.Id()), "Checks re read writed baby")
+	require.Equal(t, nb.Id(), currentBaby.Id(), "Check equals writed baby and readed baby")
+	require.Equal(t, nb.Birth().Format("2006-01-02"), currentBaby.Birth().Format("2006-01-02"), "Check equals writed baby and readed baby")
+	require.Equal(t, nb.ParentId(), currentBaby.ParentId(), "Check equals writed baby and readed baby")
 
 	// EAT
 	event := newEvent(currentBaby.Id())
 	e := newEat(*event)
 	e.SetStart(getDataForTest())
 	e.SetDescription("eat from tests")
-	assert.NoError(t, e.writeStructToBase(), "checks write eat to base")
+	require.NoError(t, e.writeStructToBase(), "checks write eat to base")
 
 	ne := newEat(*newEvent(currentBaby.Id()))
-	assert.NoError(t, ne.readStructFromBase(e.Id()), "Checks read eat from base")
+	require.NoError(t, ne.readStructFromBase(e.Id()), "Checks read eat from base")
 
 	fmt.Println(e.Start())
 	fmt.Println(ne.Start())
 
-	assert.Equal(t, ne.Id(), e.Id(), "Tests readed eat == writed eat")
-	assert.Equal(t, ne.Start().Format("2006-01-02 15:04"),
+	require.Equal(t, ne.Id(), e.Id(), "Tests readed eat == writed eat")
+	require.Equal(t, ne.Start().Format("2006-01-02 15:04"),
 		e.Start().Format("2006-01-02 15:04"),
 		"Tests readed eat == writed eat")
-	assert.Equal(t, ne.Description(), e.Description(), "Tests read eat == write eat")
+	require.Equal(t, ne.Description(), e.Description(), "Tests read eat == write eat")
 
 	// PAMPERS
 	event = newEvent(currentBaby.Id())
 	p := newPampers(*event)
 	p.SetStart(getDataForTest())
-	assert.Error(t, p.SetState(5), "Set not valid state to pampers")
-	assert.NoError(t, p.SetState(wet), "Set valid state to pampers")
+	require.Error(t, p.SetState(5), "Set not valid state to pampers")
+	require.NoError(t, p.SetState(wet), "Set valid state to pampers")
 
-	assert.NoError(t, p.writeStructToBase(), "test writes pampers to base")
+	require.NoError(t, p.writeStructToBase(), "test writes pampers to base")
 
 	np := newPampers(*newEvent(currentBaby.Id()))
-	assert.NoError(t, np.readStructFromBase(p.Id()), "test reads writed pampers from base")
+	require.NoError(t, np.readStructFromBase(p.Id()), "test reads writed pampers from base")
 
-	assert.Equal(t, p.BabyId(), np.BabyId(), "tests readed pampers == writed pampers")
-	assert.Equal(t, p.Start().Format("2006-01-02 15:04"),
+	require.Equal(t, p.BabyId(), np.BabyId(), "tests readed pampers == writed pampers")
+	require.Equal(t, p.Start().Format("2006-01-02 15:04"),
 		np.Start().Format("2006-01-02 15:04"),
 		"tests readed pampers == writed pampers")
-	assert.Equal(t, p.State(), np.State(), "tests readed pampers == writed pampers")
+	require.Equal(t, p.State(), np.State(), "tests readed pampers == writed pampers")
 
 	// SLEEP
 	event = newEvent(currentBaby.Id())
@@ -236,43 +237,43 @@ func TestWriteStructToBaseReadStructFromBase(t *testing.T) {
 
 	sl.SetStart(getDataForTest())
 
-	assert.NoError(t, sl.writeStructToBase(), "tests write not ended sleep to base")
+	require.NoError(t, sl.writeStructToBase(), "tests write not ended sleep to base")
 
 	ns := newSleep(*newEvent(currentBaby.Id()))
-	assert.NoError(t, ns.readStructFromBase(sl.Id()), "tests read writed not ended sleep")
+	require.NoError(t, ns.readStructFromBase(sl.Id()), "tests read writed not ended sleep")
 
-	assert.Equal(t, ns.BabyId(), sl.BabyId(), "test readed not ended sleep == writed")
-	assert.Equal(t, ns.Start().Format("2006-01-02 15:04"),
+	require.Equal(t, ns.BabyId(), sl.BabyId(), "test readed not ended sleep == writed")
+	require.Equal(t, ns.Start().Format("2006-01-02 15:04"),
 		sl.Start().Format("2006-01-02 15:04"),
 		"test readed not ended sleep == writed")
 
 	sl.SetStart(getDataForTest())
-	assert.NoError(t, sl.writeStructToBase(), "tests updated not ended sleep to base")
-	assert.NoError(t, ns.readStructFromBase(sl.Id()), "tests read updated not ended sleep")
-	assert.Equal(t, ns.Start().Format("2006-01-02 15:04"),
+	require.NoError(t, sl.writeStructToBase(), "tests updated not ended sleep to base")
+	require.NoError(t, ns.readStructFromBase(sl.Id()), "tests read updated not ended sleep")
+	require.Equal(t, ns.Start().Format("2006-01-02 15:04"),
 		sl.Start().Format("2006-01-02 15:04"),
 		"test readed updated not ended sleep == writed")
 
 	ns.SetEndTime(getDataForTest())
-	assert.NoError(t, ns.writeStructToBase(), "Write end of sleep")
-	assert.NoError(t, sl.readStructFromBase(ns.Id()), "test read writed ended")
+	require.NoError(t, ns.writeStructToBase(), "Write end of sleep")
+	require.NoError(t, sl.readStructFromBase(ns.Id()), "test read writed ended")
 
-	assert.Equal(t, ns.End().Format("2006-01-02 15:04"), sl.End().Format("2006-01-02 15:04"),
+	require.Equal(t, ns.End().Format("2006-01-02 15:04"), sl.End().Format("2006-01-02 15:04"),
 		"tests end time write == end time readed")
 
 	sl = newSleep(*newEvent(currentBaby.Id()))
 	sl.SetStart(getDataForTest())
 	sl.SetEndTime(getDataForTest())
 
-	assert.NoError(t, sl.writeStructToBase(), "test write sleep with end")
-	assert.NoError(t, ns.readStructFromBase(sl.Id()), "test read sleep writed with end")
+	require.NoError(t, sl.writeStructToBase(), "test write sleep with end")
+	require.NoError(t, ns.readStructFromBase(sl.Id()), "test read sleep writed with end")
 
-	assert.Equal(t,
+	require.Equal(t,
 		ns.Start().Format("2006-01-02 15:04"),
 		sl.Start().Format("2006-01-02 15:04"),
 		"tests readed with end sleep == writed with end sleep")
 
-	assert.Equal(t,
+	require.Equal(t,
 		ns.End().Format("2006-01-02 15:04"),
 		sl.End().Format("2006-01-02 15:04"),
 		"tests readed with end sleep == writed with end sleep")
@@ -360,6 +361,10 @@ func TestBabyActivity(t *testing.T) {
 	res, err = UA.doActivity([]string{"1", "5392"})
 	assert.Error(t, err, "Test set current baby with not existing number")
 	assert.Empty(t, res, "Test set current baby with not existing number")
+
+	res, err = UA.doActivity([]string{"1", "0"})
+	assert.Error(t, err, "Test set current baby to zero")
+	assert.Empty(t, res, "Test set current baby to zero")
 
 	res, err = UA.doActivity([]string{"1", "1"})
 	assert.NoError(t, err, "Test set current baby")
