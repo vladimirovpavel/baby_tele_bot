@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  db:
+    build: ./postgres/
+    env_file:
+      - postgres.env
+    volumes:
+      - baby_postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+volumes:
+  baby_postgres:
+    external: true

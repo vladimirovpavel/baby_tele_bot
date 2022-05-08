@@ -17,6 +17,7 @@ type eventI interface {
 	String() string
 
 	CheckExisting(table string, id int64) bool
+	GetSpecialValueString() string
 
 	//SelectByBabyDate(queryParam []string) eventI
 }
@@ -45,8 +46,7 @@ func (e *event) SetStart(t time.Time) {
 }
 
 func (e event) String() string {
-	return fmt.Sprintf("Event of baby %d, started ad %s",
-		e.babyId, e.Start().Format(("2006-01-02")))
+	return e.Start().Format("2006-01-02")
 }
 
 func (e event) CheckExisting(table string, id int64) bool {
@@ -207,6 +207,18 @@ func (s sleep) Id() int64 {
 	return s.id
 }
 
+func (s sleep) GetSpecialValueString() string {
+	var result string
+	if !s.endTime.IsZero() {
+		result = fmt.Sprintf("сон начался в %s, закончился в %s",
+			s.start.Format("2006-01-02 13:04"), s.endTime.Format("2006-01-02 13:04"))
+	} else {
+		result = fmt.Sprintf("сон начался в %s, еще не закончился",
+			s.start.Format("2006-01-02 13:04"))
+	}
+	return result
+}
+
 //------------------------------PAMPERS INTERFACES------------------------------
 
 type pampersState int64
@@ -311,6 +323,10 @@ func (p pampers) Id() int64 {
 	return p.id
 }
 
+func (p pampers) GetSpecialValueString() string {
+	return fmt.Sprintf("%d", p.state)
+}
+
 //---------------------------------------EAT INTERFACE----------------------------------
 type eatI interface {
 	eventBaseWorker
@@ -398,4 +414,8 @@ func (e *eat) readStructFromBase(id int64) error {
 
 func (e *eat) SetId(id int64) {
 	e.id = id
+}
+
+func (e eat) GetSpecialValueString() string {
+	return e.description
 }

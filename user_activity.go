@@ -138,7 +138,6 @@ func (ea eventActivity) doActivity(args []string) (string, error) {
 	}
 
 	var timeString string
-	// TODO: month len, after pm time
 	switch len(args[1]) {
 	case 5:
 		timeString = fmt.Sprintf("%s_%s", time.Now().Format("2006-01-02"), args[1])
@@ -379,15 +378,64 @@ func (sa stateActivity) doActivity(args []string) (string, error) {
 		return result, fmt.Errorf("current baby not found")
 	}
 
+	/* статистика за день:
+	время подъема
+	продолжительность ночи
+	количество снов
+	суммарно отоспано
+	суммарно отгуляно
+	предполагаемое время 12-часового ВБ
+
+	количество и тип памперсов
+	количество приемов пищи*/
+
+	/* статистика за неделю и месяц:
+	средняя продолжительность вб\день
+	среднее количество ДС\день
+	средняя продолжительность ДС\день
+	средняя продолжительность ночи
+
+	среднее количество памперсов\день
+	среднее количество приемов пищи\день
+	*/
+
+	// функции для получения статистики:
+	// 	-	за месяц
+	// 	-	за неделю
+	// 	- 	за день
+	// GetEventByDate(eventType, startDate, endDate) []eventI
+	// CalculateState([]eventI, )
+
 	switch sa.action {
 	case "today":
 		{
+			// need to return state:
+			//		- count of sleeps
+			// 		- middle sleep time
+			//		- count of VB
+			//		- middle VB time
+			// 		- probably today 12-hours VB
+
+			// about pampers:
+			//		-	count wet
+			//		-	count dirty
+			//		-	count combine
 		}
 	case "week":
 		{
+			// state:
+			//		-	middle count of sleeps by day
+			//		-	middle sleep time
+			//		-	middle VB count by day
+			//		-	middle VB time
 		}
 	case "month":
 		{
+			// state:
+			//		-	middle count of sleeps by day
+			//		-	middle sleep time
+			//		-	middle VB count by day
+			//		-	middle VB time
 		}
 	}
 	result = fmt.Sprintf("Result for %s state", sa.action)

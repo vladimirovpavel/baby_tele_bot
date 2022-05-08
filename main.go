@@ -8,6 +8,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// repalces assert to require
+// добавил метод GetSpecialValue к каждому из конкретных событий
+// исправил в DBReadRow - возврат ошибки из result, если она происходит
+// исправил GetTypedEventByBabyDate - поставил верхнюю границу для запроса по дате
+// исправил вывод активного ребенка
+
 //var logger = zap.NewDevelopmentConfig()
 
 // сделать докер контейнер для baby-tracker с передачей токена бота через env

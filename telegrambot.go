@@ -17,29 +17,6 @@ import (
 //	2. реализуем для него структуру в events, включая event
 //	3. реализуем добавление в базу и таблицу в базе
 
-/* var eventNumericKeyboard = tgbotapi.NewReplyKeyboard(
-	tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("1"),
-		tgbotapi.NewKeyboardButton("2"),
-		tgbotapi.NewKeyboardButton("3"),
-	),
-	tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("4"),
-		tgbotapi.NewKeyboardButton("5"),
-		tgbotapi.NewKeyboardButton("6"),
-	),
-	tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("7"),
-		tgbotapi.NewKeyboardButton("8"),
-		tgbotapi.NewKeyboardButton("9"),
-	),
-	tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton(":"),
-		tgbotapi.NewKeyboardButton("0"),
-		tgbotapi.NewKeyboardButton("."),
-	),
-) */
-
 var token string
 
 func telegramBot() {
@@ -115,12 +92,12 @@ func telegramBot() {
 								msgToUser = tgbotapi.NewMessage(update.Message.Chat.ID, "Сначала выберите ребенка в /babyes_data")
 								break
 							} else {
-								// TODO: здесь проблема в получении и выводе eventI:
-								// а значит, нет вывода типа конкретного события
+								// TODO: переработал вывод - надо проверить что вышло
 								events := GetEventsByBabyDate(currentBaby.Id(), time.Now())
 								text = "События за сегодня:\n"
 								for _, e := range events {
-									text = fmt.Sprintf("%s\t- %s\n", text, e)
+									text = fmt.Sprintf("%s\t-%s %s\n",
+										text, e, e.GetSpecialValueString())
 								}
 								text = fmt.Sprintf("%s\nВыберите действие:", text)
 								UA = NewEventActivity()
@@ -158,13 +135,12 @@ func telegramBot() {
 							} else if currentBaby == nil || currentBaby.Id() == 0 {
 								text = "Вам нужно выбрать ребенка"
 							} else {
-								text = "Ваши дети:\n"
+								text = "Ваши дети:"
 								for counter, baby := range babyes {
+									text = fmt.Sprintf("\n%s  %d\t%s", text, counter+1, baby)
 									if baby.Id() == currentBaby.Id() {
-										text = fmt.Sprintf("%s  %d\t **%s** \n", text, counter+1, baby)
-
+										text = fmt.Sprintf("%s (выбран активным)", text)
 									}
-									text = fmt.Sprintf("%s  %d\t%s", text, counter+1, baby)
 								}
 
 							}

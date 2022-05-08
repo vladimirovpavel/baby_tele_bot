@@ -6,11 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// замена assert на require
+// замена require на require
 func getDataForTest() time.Time {
 
 	min := time.Date(1975, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
@@ -66,62 +65,6 @@ func createTestData() {
 	for _, p := range parents {
 		p.writeStructToBase()
 	}
-	/* var ebw []eventBaseWorker
-	event1 := newEvent(b1.Id())
-	event2 := newEvent(b1.Id())
-	event3 := newEvent(b2.Id())
-	event4 := newEvent(b2.Id())
-	event5 := newEvent(b2.Id())
-	event6 := newEvent(b3.Id())
-	event7 := newEvent(b3.Id())
-	event8 := newEvent(b3.Id())
-	event9 := newEvent(b3.Id())
-
-	sl1 := newSleep(*event1)
-	sl1.SetStart(getDataForTest())
-	sl1.SetEndTime(getDataForTest())
-	sl2 := newSleep(*event4)
-	sl2.SetStart(getDataForTest())
-	sl2.SetEndTime(getDataForTest())
-	sl3 := newSleep(*event6)
-	sl3.SetStart(getDataForTest())
-	sl3.SetEndTime(getDataForTest())
-
-	//var sleeps []sleepI0
-	//sleeps = append(sleeps, sl1, sl2, sl3)
-	ebw = append(ebw, sl1, sl2, sl3)
-
-	ea1 := newEat(*event2)
-	ea1.SetDescription("test_eat1")
-	ea1.SetStart(getDataForTest())
-	ea2 := newEat(*event3)
-	ea2.SetDescription("test_eat2")
-	ea2.SetStart(getDataForTest())
-	ea3 := newEat(*event7)
-	ea3.SetDescription("test_eat1")
-	ea3.SetStart(getDataForTest())
-	//var eats []eatI
-	//eats = append(eats, ea1, ea2, ea3)
-	ebw = append(ebw, ea1, ea2, ea3)
-
-	pamp1 := newPampers(*event5)
-	pamp1.SetState(dirty)
-	pamp1.SetStart(getDataForTest())
-	pamp2 := newPampers(*event8)
-	pamp2.SetState(dirty)
-	pamp2.SetStart(getDataForTest())
-	pamp3 := newPampers(*event9)
-	pamp3.SetState(dirty)
-	pamp3.SetStart(getDataForTest())
-	p1.CurrentBaby()
-	//var pampers []pampersI
-	//TODO: if getcurrentbaby == err - set to 0
-	//pampers = append(pampers, pamp1, pamp2, pamp3)
-	ebw = append(ebw, pamp1, pamp2, pamp3)
-
-	for _, e := range ebw {
-		e.writeStructToBase()
-	} */
 
 }
 
@@ -143,8 +86,10 @@ func cleanupDB() {
 		"birth",
 		"birth",
 		time.Now().Format("2006-01-02"))); err != nil {
+		fmt.Println(err.Error())
 	}
 	if err := DBDeleteData("delete from parent where parent_id=1 or parent_id=2 or parent_id=125"); err != nil {
+		fmt.Println(err.Error())
 
 	}
 }
@@ -152,7 +97,7 @@ func cleanupDB() {
 func TestWriteStructToBaseReadStructFromBase(t *testing.T) {
 	cleanupDB()
 	createTestData()
-	//defer cleanupDB()
+	defer cleanupDB()
 
 	// PARENT
 	testParent := newParent()
@@ -283,10 +228,10 @@ func TestRegisterParent(t *testing.T) {
 	var testId int64 = 125
 	var testName string = "testPar"
 	tp, err := RegisterNewParent(testId, testName)
-	assert.Nil(t, err, "Testing parent created")
-	assert.Equal(t, tp.Id(), testId, "Test id is ok")
-	assert.Equal(t, tp.Name(), testName)
-	assert.Equal(t, tp.CurrentBaby(), int64(0), "test current baby is nil")
+	require.Nil(t, err, "Testing parent created")
+	require.Equal(t, tp.Id(), testId, "Test id is ok")
+	require.Equal(t, tp.Name(), testName)
+	require.Equal(t, tp.CurrentBaby(), int64(0), "test current baby is nil")
 }
 
 func TestCurrentBaby(t *testing.T) {
@@ -296,10 +241,10 @@ func TestCurrentBaby(t *testing.T) {
 
 	p := newParent()
 	p.readStructFromBase(1)
-	assert.Equal(t, p.Id(), int64(1))
+	require.Equal(t, p.Id(), int64(1))
 
-	assert.NotEqual(t, p.CurrentBaby(), int64(0))
-	assert.Error(t, p.SetCurrentBaby(-125), "tests not set not exist baby")
+	require.NotEqual(t, p.CurrentBaby(), int64(0))
+	require.Error(t, p.SetCurrentBaby(-125), "tests not set not exist baby")
 }
 
 func TestGetEventsByBabyDate(t *testing.T) {
@@ -307,8 +252,8 @@ func TestGetEventsByBabyDate(t *testing.T) {
 	defer cleanupDB()
 
 	p1 := newParent()
-	assert.Nil(t, p1.readStructFromBase(1), "Tests read parent")
-	assert.NotEqual(t, p1.CurrentBaby(), int64(0), "Test parent have baby")
+	require.Nil(t, p1.readStructFromBase(1), "Tests read parent")
+	require.NotEqual(t, p1.CurrentBaby(), int64(0), "Test parent have baby")
 
 }
 
@@ -321,57 +266,57 @@ func TestBabyActivity(t *testing.T) {
 	UA.setAction("add")
 	// test basic activity
 	res, err := UA.doActivity([]string{""})
-	assert.Error(t, err, "Tests babyactivity with less args")
-	assert.Empty(t, res, "Tests babyactivity with less args")
+	require.Error(t, err, "Tests babyactivity with less args")
+	require.Empty(t, res, "Tests babyactivity with less args")
 
 	res, err = UA.doActivity([]string{"abc"})
-	assert.Error(t, err, "Tests babyactivity with not numeric parent id")
-	assert.Empty(t, res, "Tests babyactivity with not numeric parent id")
+	require.Error(t, err, "Tests babyactivity with not numeric parent id")
+	require.Empty(t, res, "Tests babyactivity with not numeric parent id")
 
 	res, err = UA.doActivity([]string{"-135"})
-	assert.Error(t, err, "Tests babyactivity with not numeric parent id")
-	assert.Empty(t, res, "Tests babyactivity with not numeric parent id")
+	require.Error(t, err, "Tests babyactivity with not numeric parent id")
+	require.Empty(t, res, "Tests babyactivity with not numeric parent id")
 
 	// test add action
 	UA.setAction("add")
 
 	res, err = UA.doActivity([]string{"1", "testname"})
-	assert.Error(t, err, "Tests add baby with less args")
-	assert.Empty(t, res, "Tests add baby with less args")
+	require.Error(t, err, "Tests add baby with less args")
+	require.Empty(t, res, "Tests add baby with less args")
 
 	res, err = UA.doActivity([]string{"1", "testname", "abc"})
-	assert.Error(t, err, "Tests add baby with not valid time")
-	assert.Empty(t, res, "Tests add baby with not valid time")
+	require.Error(t, err, "Tests add baby with not valid time")
+	require.Empty(t, res, "Tests add baby with not valid time")
 
 	res, err = UA.doActivity([]string{"1", "testname", "abc"})
-	assert.Error(t, err, "Tests add baby with not valid time")
-	assert.Empty(t, res, "Tests add baby with not valid time")
+	require.Error(t, err, "Tests add baby with not valid time")
+	require.Empty(t, res, "Tests add baby with not valid time")
 
 	res, err = UA.doActivity([]string{"1", "testname", "1975-03-12"})
-	assert.Nil(t, err, "Tests baby added")
-	assert.NotEmpty(t, res, "Tests baby succesfully added")
+	require.Nil(t, err, "Tests baby added")
+	require.NotEmpty(t, res, "Tests baby succesfully added")
 
 	//test set action
 	UA.setAction("current")
 
 	res, err = UA.doActivity([]string{"1", "abc"})
-	assert.Error(t, err, "Test set current baby with not digit number")
-	assert.Empty(t, res, "Test set current baby with not digit number")
+	require.Error(t, err, "Test set current baby with not digit number")
+	require.Empty(t, res, "Test set current baby with not digit number")
 
 	res, err = UA.doActivity([]string{"1", "5392"})
-	assert.Error(t, err, "Test set current baby with not existing number")
-	assert.Empty(t, res, "Test set current baby with not existing number")
+	require.Error(t, err, "Test set current baby with not existing number")
+	require.Empty(t, res, "Test set current baby with not existing number")
 
 	res, err = UA.doActivity([]string{"1", "0"})
-	assert.Error(t, err, "Test set current baby to zero")
-	assert.Empty(t, res, "Test set current baby to zero")
+	require.Error(t, err, "Test set current baby to zero")
+	require.Empty(t, res, "Test set current baby to zero")
 
 	res, err = UA.doActivity([]string{"1", "1"})
-	assert.NoError(t, err, "Test set current baby")
-	assert.NotEmpty(t, res, "Test set current baby")
+	require.NoError(t, err, "Test set current baby")
+	require.NotEmpty(t, res, "Test set current baby")
 
 	currentB, err := GetCurrentBaby(1)
-	assert.NoError(t, err, "test current baby is setted")
+	require.NoError(t, err, "test current baby is setted")
 	allBs, _ := GetBabyesByParent(1)
 
 	founded := false
@@ -382,26 +327,26 @@ func TestBabyActivity(t *testing.T) {
 		}
 	}
 
-	assert.True(t, founded, "tests id of setted current baby == current_baby of parent")
+	require.True(t, founded, "tests id of setted current baby == current_baby of parent")
 
 	// test remove
 	UA.setAction("remove")
 	res, err = UA.doActivity([]string{"1", "abc"})
-	assert.Error(t, err, "Test remove current baby with not digit number")
-	assert.Empty(t, res, "Test remove current baby with not digit number")
+	require.Error(t, err, "Test remove current baby with not digit number")
+	require.Empty(t, res, "Test remove current baby with not digit number")
 
 	res, err = UA.doActivity([]string{"1", "5392"})
-	assert.Error(t, err, "Test  remove baby with not existing number")
-	assert.Empty(t, res, "Test  remove baby with not existing number")
+	require.Error(t, err, "Test  remove baby with not existing number")
+	require.Empty(t, res, "Test  remove baby with not existing number")
 
 	res, err = UA.doActivity([]string{"1", "1"})
-	assert.NoError(t, err, "Test remove current baby")
-	assert.NotEmpty(t, res, "Test remove current baby")
+	require.NoError(t, err, "Test remove current baby")
+	require.NotEmpty(t, res, "Test remove current baby")
 
 	p := newParent()
 	err = p.readStructFromBase(1)
-	assert.Equal(t, int64(0), p.CurrentBaby(), "Test when remove current baby - it setted to 0")
-	assert.NoError(t, err, "Test when remove current baby - it setted to 0")
+	require.Equal(t, int64(0), p.CurrentBaby(), "Test when remove current baby - it setted to 0")
+	require.NoError(t, err, "Test when remove current baby - it setted to 0")
 
 	res, err = UA.doActivity([]string{" "})
 
@@ -417,20 +362,20 @@ func TestEventActivity(t *testing.T) {
 	// test basic activity
 
 	res, err := UA.doActivity([]string{""})
-	assert.Error(t, err, "Tests EventActivity with less args")
-	assert.Empty(t, res, "Tests EventActivity with less args")
+	require.Error(t, err, "Tests EventActivity with less args")
+	require.Empty(t, res, "Tests EventActivity with less args")
 
 	res, err = UA.doActivity([]string{"abc"})
-	assert.Error(t, err, "Tests EventActivity with not numeric parent id")
-	assert.Empty(t, res, "Tests EventActivity with not numeric parent id")
+	require.Error(t, err, "Tests EventActivity with not numeric parent id")
+	require.Empty(t, res, "Tests EventActivity with not numeric parent id")
 
 	res, err = UA.doActivity([]string{"-135"})
-	assert.Error(t, err, "Tests EventActivity with no existing parent id")
-	assert.Empty(t, res, "Tests EventActivity with no existing parent id")
+	require.Error(t, err, "Tests EventActivity with no existing parent id")
+	require.Empty(t, res, "Tests EventActivity with no existing parent id")
 
 	currentB, err := GetCurrentBaby(1)
-	assert.NoError(t, err, "tests current baby exists")
-	assert.NotNil(t, currentB, "tests current baby exists")
+	require.NoError(t, err, "tests current baby exists")
+	require.NotNil(t, currentB, "tests current baby exists")
 
 	p := newParent()
 	p.readStructFromBase(1)
@@ -440,33 +385,33 @@ func TestEventActivity(t *testing.T) {
 	p.writeStructToBase()
 
 	res, err = UA.doActivity([]string{"1", "03.05"})
-	assert.Error(t, err, "try to write with current_baby = 0 for parent")
-	assert.Empty(t, res, "try to write with current_baby = 0 for parent")
+	require.Error(t, err, "try to write with current_baby = 0 for parent")
+	require.Empty(t, res, "try to write with current_baby = 0 for parent")
 
 	p.SetCurrentBaby(actualCurrentBaby)
 	p.writeStructToBase()
 
 	res, err = UA.doActivity([]string{"1", "1"})
-	assert.Error(t, err, "tests event with not valid time")
-	assert.Empty(t, res, "tests event with not valid time")
+	require.Error(t, err, "tests event with not valid time")
+	require.Empty(t, res, "tests event with not valid time")
 
 	res, err = UA.doActivity([]string{"1", "03.05"})
-	assert.Error(t, err, "tests event with not valid time format with only time")
-	assert.Empty(t, res, "tests event with not valid time format with only time")
+	require.Error(t, err, "tests event with not valid time format with only time")
+	require.Empty(t, res, "tests event with not valid time format with only time")
 
 	res, err = UA.doActivity([]string{"1", "2006+01*02_03.05"})
-	assert.Error(t, err, "tests event with not valid time format with time and date")
-	assert.Empty(t, res, "tests event with not valid time format with time and date")
+	require.Error(t, err, "tests event with not valid time format with time and date")
+	require.Empty(t, res, "tests event with not valid time format with time and date")
 
 	res, err = UA.doActivity([]string{"1", "2006+01*02_03.05"})
-	assert.Error(t, err, "tests event with not valid time format with time and date")
-	assert.Empty(t, res, "tests event with not valid time format with time and date")
+	require.Error(t, err, "tests event with not valid time format with time and date")
+	require.Empty(t, res, "tests event with not valid time format with time and date")
 
 	// ACTION SLEEP
 	UA.setAction("sleep")
 	res, err = UA.doActivity([]string{"1", "15:04"})
-	assert.NoError(t, err, "valid only time")
-	assert.NotEmpty(t, res, "valid only time")
+	require.NoError(t, err, "valid only time")
+	require.NotEmpty(t, res, "valid only time")
 
 	b := newBaby()
 	b.readStructFromBase(p.CurrentBaby())
@@ -474,18 +419,18 @@ func TestEventActivity(t *testing.T) {
 	//new created sleep must be not ended
 	notEndedSleep, _ := GetNotEndedSleepForBaby(b.Id())
 	sleepsIds, err := GetTypedEventsIdsByBabyDate(p.CurrentBaby(), time.Now(), "sleep")
-	assert.NoError(t, err, fmt.Sprintf("get all sleeps by date error: %s", err))
+	require.NoError(t, err, fmt.Sprintf("get all sleeps by date error: %s", err))
 
-	assert.Equal(t, notEndedSleep.Id(), sleepsIds[0],
+	require.Equal(t, notEndedSleep.Id(), sleepsIds[0],
 		"baby have not ended sleep. And it single sleep today")
 
 	res, err = UA.doActivity([]string{"1", time.Now().Format("2006-1-02_15:04")})
-	assert.NoError(t, err, "set end of sleep")
-	assert.NotEmpty(t, res, "set end of sleep")
+	require.NoError(t, err, "set end of sleep")
+	require.NotEmpty(t, res, "set end of sleep")
 
 	notEndedSleep.readStructFromBase(notEndedSleep.Id())
-	assert.NotEmpty(t, notEndedSleep.End(), "end of sleep setted")
-	assert.Equal(t,
+	require.NotEmpty(t, notEndedSleep.End(), "end of sleep setted")
+	require.Equal(t,
 		time.Now().Format("2006-01-02 15:04"),
 		notEndedSleep.End().Format("2006-01-02 15:04"),
 		"sleep ended tommorow")
@@ -496,52 +441,52 @@ func TestEventActivity(t *testing.T) {
 	p.readStructFromBase(1)
 
 	res, err = UA.doActivity([]string{"1", "15:04"})
-	assert.Error(t, err, "without parmers state")
-	assert.Empty(t, res, "without parmers state")
+	require.Error(t, err, "without parmers state")
+	require.Empty(t, res, "without parmers state")
 
 	res, err = UA.doActivity([]string{"1", "15:04", "abc"})
-	assert.Error(t, err, "wrong parmers state")
-	assert.Empty(t, res, "wrong parmers state")
+	require.Error(t, err, "wrong parmers state")
+	require.Empty(t, res, "wrong parmers state")
 
 	res, err = UA.doActivity([]string{"1", "15:04", "wet"})
-	assert.NoError(t, err, "wet parmers state")
-	assert.NotEmpty(t, res, "wet parmers state")
+	require.NoError(t, err, "wet parmers state")
+	require.NotEmpty(t, res, "wet parmers state")
 
 	res, err = UA.doActivity([]string{"1", "15:04", "dirty"})
-	assert.NoError(t, err, "dirty parmers state")
-	assert.NotEmpty(t, res, "dirty parmers state")
+	require.NoError(t, err, "dirty parmers state")
+	require.NotEmpty(t, res, "dirty parmers state")
 
 	res, err = UA.doActivity([]string{"1", "15:04", "combined"})
-	assert.NoError(t, err, "combined parmers state")
-	assert.NotEmpty(t, res, "combined parmers state")
+	require.NoError(t, err, "combined parmers state")
+	require.NotEmpty(t, res, "combined parmers state")
 
 	pampersIds, err := GetTypedEventsIdsByBabyDate(p.CurrentBaby(), time.Now(), "pampers")
 
-	assert.NoError(t, err, fmt.Sprintf("tests get pampers by date: %s", err))
-	assert.Equal(t, 3, len(pampersIds), "tests count of added pampers  == 3")
+	require.NoError(t, err, fmt.Sprintf("tests get pampers by date: %s", err))
+	require.Equal(t, 3, len(pampersIds), "tests count of added pampers  == 3")
 
 	pamp := newPampers(*newEvent(p.CurrentBaby()))
 	pamp.readStructFromBase(pampersIds[0])
-	assert.Equal(t, wet, pamp.state, "tests wet state of pamp succesfully writed")
+	require.Equal(t, wet, pamp.state, "tests wet state of pamp succesfully writed")
 
 	pamp.readStructFromBase(pampersIds[1])
-	assert.Equal(t, dirty, pamp.state, "tests dirty state of pamp succesfully writed")
+	require.Equal(t, dirty, pamp.state, "tests dirty state of pamp succesfully writed")
 
 	pamp.readStructFromBase(pampersIds[2])
-	assert.Equal(t, combined, pamp.state, "tests combined state of pamp succesfully writed")
+	require.Equal(t, combined, pamp.state, "tests combined state of pamp succesfully writed")
 
 	UA.setAction("eat")
 
 	res, err = UA.doActivity([]string{"1", "15:04"})
-	assert.NoError(t, err, "tests add eat without description")
-	assert.NotEmpty(t, res, "tests adde at without description")
+	require.NoError(t, err, "tests add eat without description")
+	require.NotEmpty(t, res, "tests adde at without description")
 	res, err = UA.doActivity([]string{"1", "15:04", ""})
-	assert.NoError(t, err, "tests add eat with empty description")
-	assert.NotEmpty(t, res, "tests add eat with empty description")
+	require.NoError(t, err, "tests add eat with empty description")
+	require.NotEmpty(t, res, "tests add eat with empty description")
 
 	res, err = UA.doActivity([]string{"1", "15:04", "this is test eat"})
-	assert.NoError(t, err, "tests add eat with description")
-	assert.NotEmpty(t, res, "tests add eat with description")
+	require.NoError(t, err, "tests add eat with description")
+	require.NotEmpty(t, res, "tests add eat with description")
 
 }
 
@@ -555,16 +500,20 @@ func TestStateActivity(t *testing.T) {
 	// test basic activity
 
 	res, err := UA.doActivity([]string{""})
-	assert.Error(t, err, "Tests StateActivity with less args")
-	assert.Empty(t, res, "Tests StateActivity with less args")
+	require.Error(t, err, "Tests StateActivity with less args")
+	require.Empty(t, res, "Tests StateActivity with less args")
 
 	res, err = UA.doActivity([]string{"abc"})
-	assert.Error(t, err, "Tests StateActivity with not numeric parent id")
-	assert.Empty(t, res, "Tests StateActivity with not numeric parent id")
+	require.Error(t, err, "Tests StateActivity with not numeric parent id")
+	require.Empty(t, res, "Tests StateActivity with not numeric parent id")
 
 	res, err = UA.doActivity([]string{"-135"})
-	assert.Error(t, err, "Tests StateActivity with not numeric parent id")
-	assert.Empty(t, res, "Tests StateActivity with not numeric parent id")
+	require.Error(t, err, "Tests StateActivity with not numeric parent id")
+	require.Empty(t, res, "Tests StateActivity with not numeric parent id")
+
+	res, err = UA.doActivity([]string{"0"})
+	require.Error(t, err, "Tests StateActivity with not numeric parent id")
+	require.Empty(t, res, "Tests StateActivity with not numeric parent id")
 
 	UA.setAction("week")
 	UA.setAction("month")
